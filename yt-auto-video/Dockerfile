@@ -22,5 +22,5 @@ COPY . .
 # Port
 EXPOSE 3000
 
-# Çalıştırma komutu
-CMD ["npm", "start"]
+# Çalıştırma komutu: Önce DB tablolarını oluştur (push), sonra sunucuyu başlat
+CMD ["/bin/sh", "-c", "npx prisma db push && npm start"]
