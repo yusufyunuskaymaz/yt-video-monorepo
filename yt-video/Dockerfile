@@ -1,9 +1,6 @@
 FROM python:3.12-slim
 
 # Sistem bağımlılıklarını yükle
-# ffmpeg: Video işleme
-# imagemagick: MoviePy TextClip için (altyazı vs)
-# libsm6, libxext6: OpenCV bağımlılıkları
 RUN apt-get update && apt-get install -y \
     ffmpeg \
     imagemagick \
@@ -12,9 +9,15 @@ RUN apt-get update && apt-get install -y \
     ghostscript \
     && rm -rf /var/lib/apt/lists/*
 
-# ImageMagick policy düzenlemesi (MoviePy'nin çalışması için gerekli)
-# "none" olan policy'i "read|write" olarak değiştirir
-RUN sed -i 's/none/read,write/g' /etc/ImageMagick-6/policy.xml
+# ImageMagick policy düzenlemesi (Versiyon bağımsız çözüm)
+# policy.xml dosyasını bul ve düzenle (6 veya 7 olabilir)
+RUN if [ -f /etc/ImageMagick-6/policy.xml ]; then \
+        sed -i 's/none/read,write/g' /etc/ImageMagick-6/policy.xml; \
+    elif [ -f /etc/ImageMagick-7/policy.xml ]; then \
+        sed -i 's/none/read,write/g' /etc/ImageMagick-7/policy.xml; \
+    elif [ -f /etc/ImageMagick/policy.xml ]; then \
+        sed -i 's/none/read,write/g' /etc/ImageMagick/policy.xml; \
+    fi
 
 # Çalışma dizini
 WORKDIR /app
