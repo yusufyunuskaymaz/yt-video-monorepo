@@ -1,0 +1,43 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Project {
+  id            Int      @id @default(autoincrement())
+  title         String
+  totalDuration Int
+  totalScenes   Int
+  status        String   @default("pending")
+  finalVideoUrl String? // Birleştirilmiş final video
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  scenes        Scene[]
+}
+
+model Scene {
+  id               Int      @id @default(autoincrement())
+  projectId        Int
+  project          Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sceneNumber      Int
+  timestamp        String
+  narration        String
+  subject          String
+  imageUrl         String?
+  audioUrl         String?
+  audioDuration    Float? // Ses süresi (saniye)
+  audioVoice       String? // TTS ses (walter, vb.)
+  audioTemperature Float? // TTS temperature
+  videoUrl         String? // Sessiz video (Ken Burns)
+  mergedVideoUrl   String? // Sesli video (video + audio birleşik)
+  status           String   @default("pending")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([projectId])
+  @@index([status])
+}

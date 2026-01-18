@@ -1,0 +1,1081 @@
+<!DOCTYPE html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Video Generator</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        font-family: "Inter", sans-serif;
+        background: linear-gradient(
+          135deg,
+          #0f0f23 0%,
+          #1a1a3e 50%,
+          #0f0f23 100%
+        );
+        min-height: 100vh;
+        color: #ffffff;
+      }
+      .container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 30px 20px;
+      }
+      header {
+        text-align: center;
+        margin-bottom: 30px;
+      }
+      h1 {
+        font-size: 2.2rem;
+        font-weight: 700;
+        background: linear-gradient(
+          135deg,
+          #667eea 0%,
+          #764ba2 50%,
+          #f093fb 100%
+        );
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        margin-bottom: 8px;
+      }
+      .subtitle {
+        color: #a0a0c0;
+        font-size: 0.95rem;
+      }
+      .tabs {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 25px;
+        justify-content: center;
+      }
+      .tab {
+        padding: 10px 20px;
+        background: rgba(255, 255, 255, 0.05);
+        border: 2px solid rgba(255, 255, 255, 0.1);
+        border-radius: 10px;
+        color: #a0a0c0;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.3s ease;
+      }
+      .tab:hover {
+        background: rgba(102, 126, 234, 0.2);
+        border-color: rgba(102, 126, 234, 0.5);
+      }
+      .tab.active {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-color: transparent;
+        color: #fff;
+      }
+      .card {
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(20px);
+        border-radius: 16px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 25px;
+        margin-bottom: 20px;
+      }
+      .form-group {
+        margin-bottom: 18px;
+      }
+      label {
+        display: block;
+        margin-bottom: 6px;
+        font-weight: 500;
+        color: #c0c0e0;
+        font-size: 0.9rem;
+      }
+      textarea {
+        width: 100%;
+        min-height: 250px;
+        padding: 14px;
+        background: rgba(0, 0, 0, 0.3);
+        border: 2px solid rgba(255, 255, 255, 0.1);
+        border-radius: 10px;
+        color: #ffffff;
+        font-family: "Monaco", "Consolas", monospace;
+        font-size: 12px;
+        resize: vertical;
+        transition: all 0.3s ease;
+      }
+      textarea:focus {
+        outline: none;
+        border-color: #667eea;
+      }
+      .btn {
+        padding: 12px 24px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: none;
+        border-radius: 10px;
+        color: #ffffff;
+        font-size: 0.9rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .btn:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+      }
+      .btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+      .btn-secondary {
+        background: rgba(255, 255, 255, 0.1);
+      }
+      .btn-sm {
+        padding: 8px 14px;
+        font-size: 0.8rem;
+      }
+      .projects-list {
+        display: grid;
+        gap: 12px;
+      }
+      .project-item {
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 10px;
+        padding: 16px 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        transition: all 0.3s ease;
+      }
+      .project-item:hover {
+        background: rgba(255, 255, 255, 0.08);
+      }
+      .project-info h3 {
+        font-size: 1rem;
+        margin-bottom: 4px;
+      }
+      .project-meta {
+        color: #808090;
+        font-size: 0.8rem;
+      }
+      .status-badge {
+        padding: 5px 10px;
+        border-radius: 15px;
+        font-size: 0.75rem;
+        font-weight: 500;
+      }
+      .status-pending {
+        background: rgba(255, 193, 7, 0.2);
+        color: #ffc107;
+      }
+      .status-processing {
+        background: rgba(33, 150, 243, 0.2);
+        color: #2196f3;
+      }
+      .status-completed {
+        background: rgba(76, 175, 80, 0.2);
+        color: #4caf50;
+      }
+      .status-failed {
+        background: rgba(244, 67, 54, 0.2);
+        color: #f44336;
+      }
+      .message {
+        padding: 12px;
+        border-radius: 8px;
+        margin-bottom: 15px;
+        display: none;
+        font-size: 0.9rem;
+      }
+      .message.success {
+        display: block;
+        background: rgba(76, 175, 80, 0.2);
+        border: 1px solid rgba(76, 175, 80, 0.5);
+        color: #81c784;
+      }
+      .message.error {
+        display: block;
+        background: rgba(244, 67, 54, 0.2);
+        border: 1px solid rgba(244, 67, 54, 0.5);
+        color: #e57373;
+      }
+      .hidden {
+        display: none;
+      }
+      .spinner {
+        width: 18px;
+        height: 18px;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-top-color: #fff;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      /* Scenes Table */
+      .scenes-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 15px;
+      }
+      .scenes-table th,
+      .scenes-table td {
+        padding: 12px;
+        text-align: left;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      }
+      .scenes-table th {
+        background: rgba(255, 255, 255, 0.05);
+        color: #a0a0c0;
+        font-size: 0.8rem;
+        font-weight: 600;
+        text-transform: uppercase;
+      }
+      .scenes-table tr:hover {
+        background: rgba(255, 255, 255, 0.03);
+      }
+      .scenes-table td {
+        font-size: 0.85rem;
+        color: #d0d0e0;
+      }
+      .scene-num {
+        font-weight: 600;
+        color: #667eea;
+      }
+      .scene-text {
+        max-width: 300px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .scene-img {
+        width: 60px;
+        height: 60px;
+        border-radius: 6px;
+        object-fit: cover;
+        background: rgba(255, 255, 255, 0.1);
+        cursor: pointer;
+        transition: transform 0.2s;
+      }
+      .scene-img:hover {
+        transform: scale(1.1);
+      }
+      .back-btn {
+        margin-bottom: 20px;
+      }
+      .stats-row {
+        display: flex;
+        gap: 15px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+      }
+      .stat-box {
+        background: rgba(255, 255, 255, 0.05);
+        padding: 15px 20px;
+        border-radius: 10px;
+        text-align: center;
+        min-width: 100px;
+      }
+      .stat-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #667eea;
+      }
+
+      /* Video Play Button */
+      .video-play-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 14px;
+        background: linear-gradient(135deg, #4caf50 0%, #2e7d32 100%);
+        border: none;
+        border-radius: 8px;
+        color: #fff;
+        font-size: 0.8rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+      }
+      .video-play-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
+      }
+      .no-video {
+        color: #606080;
+        font-size: 0.8rem;
+      }
+
+      /* Audio Play Button */
+      .audio-play-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 14px;
+        background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
+        border: none;
+        border-radius: 8px;
+        color: #fff;
+        font-size: 0.8rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+      }
+      .audio-play-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(255, 152, 0, 0.4);
+      }
+      .btn-audio {
+        background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
+      }
+      .btn-merge {
+        background: linear-gradient(135deg, #9c27b0 0%, #7b1fa2 100%);
+      }
+      .btn-pipeline {
+        background: linear-gradient(135deg, #e91e63 0%, #c2185b 100%);
+      }
+
+      /* Modal */
+      .modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.9);
+        z-index: 1000;
+        justify-content: center;
+        align-items: center;
+      }
+      .modal.active {
+        display: flex;
+      }
+      .modal-content {
+        max-width: 90%;
+        max-height: 90%;
+        position: relative;
+      }
+      .modal-content img {
+        max-width: 100%;
+        max-height: 85vh;
+        border-radius: 12px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+      }
+      .modal-content video {
+        max-width: 100%;
+        max-height: 85vh;
+        border-radius: 12px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+      }
+      .modal-close {
+        position: absolute;
+        top: -40px;
+        right: 0;
+        background: none;
+        border: none;
+        color: #fff;
+        font-size: 2rem;
+        cursor: pointer;
+      }
+      .modal-close:hover {
+        color: #667eea;
+      }
+      .stat-label {
+        font-size: 0.75rem;
+        color: #808090;
+        margin-top: 3px;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Image Modal -->
+    <div class="modal" id="imageModal" onclick="closeModal()">
+      <div class="modal-content" onclick="event.stopPropagation()">
+        <button class="modal-close" onclick="closeModal()">×</button>
+        <img id="modalImage" src="" alt="Preview" />
+      </div>
+    </div>
+
+    <!-- Video Modal -->
+    <div class="modal" id="videoModal" onclick="closeVideoModal()">
+      <div class="modal-content" onclick="event.stopPropagation()">
+        <button class="modal-close" onclick="closeVideoModal()">×</button>
+        <video id="modalVideo" controls autoplay>
+          <source src="" type="video/mp4" />
+        </video>
+      </div>
+    </div>
+
+    <div class="container">
+      <header>
+        <h1>🎬 AI Video Generator</h1>
+        <p class="subtitle">
+          JSON sahne verisini yapıştır, otomatik video üret
+        </p>
+      </header>
+
+      <div class="tabs" id="mainTabs">
+        <div class="tab active" data-tab="create">➕ Yeni Proje</div>
+        <div class="tab" data-tab="projects">📁 Projeler</div>
+      </div>
+
+      <!-- Create Tab -->
+      <div id="tab-create" class="tab-content">
+        <div class="card">
+          <div id="createMessage" class="message"></div>
+          <div class="form-group">
+            <label>📝 JSON Sahne Verisi</label>
+            <textarea
+              id="jsonInput"
+              placeholder='{ "title": "...", "scenes": [...] }'
+            ></textarea>
+          </div>
+          <div style="display: flex; gap: 10px">
+            <button class="btn" id="createBtn" onclick="createProject()">
+              🚀 Proje Oluştur
+            </button>
+            <button class="btn btn-secondary" onclick="formatJson()">
+              📐 Formatla
+            </button>
+            <button class="btn btn-secondary" onclick="clearInput()">
+              🗑️ Temizle
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Projects Tab -->
+      <div id="tab-projects" class="tab-content hidden">
+        <div class="card">
+          <div
+            style="
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              margin-bottom: 15px;
+            "
+          >
+            <h2 style="font-size: 1.1rem">📁 Projeler</h2>
+            <button class="btn btn-secondary btn-sm" onclick="loadProjects()">
+              🔄 Yenile
+            </button>
+          </div>
+          <div id="projectsList" class="projects-list">
+            <p style="color: #808090; text-align: center; padding: 30px">
+              Yükleniyor...
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Project Detail Tab -->
+      <div id="tab-detail" class="tab-content hidden">
+        <div style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
+          <button class="btn btn-secondary" onclick="goBack()">← Geri</button>
+          <button class="btn btn-pipeline" id="pipelineBtn" onclick="runFullPipeline()">
+            🚀 Tam Akış Başlat
+          </button>
+          <button class="btn" id="generateAllBtn" onclick="generateAllImages()">
+            🎨 Görseller
+          </button>
+          <button class="btn btn-audio" id="generateAudioBtn" onclick="generateAllAudio()">
+            🎙️ Sesler
+          </button>
+          <button class="btn" id="generateVideoBtn" onclick="generateAllVideos()">
+            🎬 Videolar
+          </button>
+          <button class="btn btn-merge" id="mergeBtn" onclick="mergeAllVideos()">
+            🔗 Birleştir
+          </button>
+          <button class="btn" id="concatBtn" onclick="concatenateFinal()" style="background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);">
+            📦 Tümünü Birleştir
+          </button>
+          <button class="btn" id="finalVideoBtn" onclick="openFinalVideo()" style="display: none; background: linear-gradient(135deg, #4caf50 0%, #2e7d32 100%);">
+            🎬 Final Video
+          </button>
+          <button class="btn btn-secondary" onclick="refreshProject()">
+            🔄 Yenile
+          </button>
+        </div>
+        <div
+          id="generateProgress"
+          class="card hidden"
+          style="
+            background: rgba(102, 126, 234, 0.1);
+            border-color: rgba(102, 126, 234, 0.3);
+          "
+        >
+          <div style="display: flex; align-items: center; gap: 15px">
+            <div class="spinner"></div>
+            <div>
+              <div style="font-weight: 600">Görseller oluşturuluyor...</div>
+              <div id="progressText" style="font-size: 0.85rem; color: #a0a0c0">
+                Lütfen bekleyin, bu işlem uzun sürebilir.
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <h2 id="detailTitle" style="font-size: 1.2rem; margin-bottom: 15px">
+            Proje Detayı
+          </h2>
+          <div class="stats-row" id="detailStats"></div>
+          <h3 style="font-size: 0.95rem; color: #a0a0c0; margin-bottom: 10px">
+            🎬 Sahneler
+          </h3>
+          <div style="overflow-x: auto">
+            <table class="scenes-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Zaman</th>
+                  <th>Anlatım</th>
+                  <th>Görsel Açıklama</th>
+                  <th>Resim</th>
+                  <th>Ses</th>
+                  <th>Video</th>
+                  <th>Sesli Video</th>
+                  <th>Durum</th>
+                </tr>
+              </thead>
+              <tbody id="scenesBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // Tab switching
+      document.querySelectorAll(".tab").forEach((tab) => {
+        tab.addEventListener("click", () => {
+          document
+            .querySelectorAll(".tab")
+            .forEach((t) => t.classList.remove("active"));
+          document
+            .querySelectorAll(".tab-content")
+            .forEach((c) => c.classList.add("hidden"));
+          tab.classList.add("active");
+          document
+            .getElementById(`tab-${tab.dataset.tab}`)
+            .classList.remove("hidden");
+          if (tab.dataset.tab === "projects") loadProjects();
+        });
+      });
+
+      // Create project
+      async function createProject() {
+        const jsonInput = document.getElementById("jsonInput").value.trim();
+        const btn = document.getElementById("createBtn");
+        const msgEl = document.getElementById("createMessage");
+        if (!jsonInput) {
+          showMessage(msgEl, "error", "JSON verisi gerekli!");
+          return;
+        }
+        let data;
+        try {
+          data = JSON.parse(jsonInput);
+        } catch (e) {
+          showMessage(msgEl, "error", "Geçersiz JSON: " + e.message);
+          return;
+        }
+        btn.disabled = true;
+        btn.innerHTML =
+          '<div class="spinner"></div><span>Oluşturuluyor...</span>';
+        msgEl.className = "message";
+        try {
+          const response = await fetch("/api/projects", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(data),
+          });
+          const result = await response.json();
+          if (result.success) {
+            showMessage(
+              msgEl,
+              "success",
+              `✅ Proje oluşturuldu! ${result.project.scenes.length} sahne kaydedildi.`
+            );
+            document.getElementById("jsonInput").value = "";
+          } else {
+            showMessage(msgEl, "error", result.error);
+          }
+        } catch (error) {
+          showMessage(msgEl, "error", "Sunucu hatası: " + error.message);
+        } finally {
+          btn.disabled = false;
+          btn.innerHTML = "🚀 Proje Oluştur";
+        }
+      }
+
+      // Load projects
+      async function loadProjects() {
+        const listEl = document.getElementById("projectsList");
+        listEl.innerHTML =
+          '<p style="color: #808090; text-align: center; padding: 30px">Yükleniyor...</p>';
+        try {
+          const response = await fetch("/api/projects");
+          const result = await response.json();
+          if (result.projects.length === 0) {
+            listEl.innerHTML =
+              '<p style="color: #808090; text-align: center; padding: 30px">Henüz proje yok</p>';
+            return;
+          }
+          listEl.innerHTML = result.projects
+            .map(
+              (p) => `
+            <div class="project-item">
+              <div class="project-info">
+                <h3>${p.title}</h3>
+                <div class="project-meta">${p._count.scenes} sahne • ${
+                p.totalDuration
+              }s • ${new Date(p.createdAt).toLocaleString("tr-TR")}</div>
+              </div>
+              <div style="display: flex; gap: 8px; align-items: center">
+                <span class="status-badge status-${p.status}">${p.status}</span>
+                <button class="btn btn-secondary btn-sm" onclick="viewProject('${
+                  p.id
+                }')">👁️ Detay</button>
+              </div>
+            </div>
+          `
+            )
+            .join("");
+        } catch (error) {
+          listEl.innerHTML = `<p style="color: #e57373; text-align: center; padding: 30px">Hata: ${error.message}</p>`;
+        }
+      }
+
+      // View project details
+      async function viewProject(id) {
+        currentProjectId = id;
+        document.getElementById("mainTabs").classList.add("hidden");
+        document
+          .querySelectorAll(".tab-content")
+          .forEach((c) => c.classList.add("hidden"));
+        document.getElementById("tab-detail").classList.remove("hidden");
+        document.getElementById("detailTitle").textContent = "Yükleniyor...";
+        document.getElementById("detailStats").innerHTML = "";
+        document.getElementById("scenesBody").innerHTML =
+          '<tr><td colspan="6" style="text-align:center;padding:30px;color:#808090">Yükleniyor...</td></tr>';
+
+        try {
+          const response = await fetch(`/api/projects/${id}`);
+          const result = await response.json();
+          if (result.success) {
+            const p = result.project;
+            document.getElementById(
+              "detailTitle"
+            ).textContent = `📽️ ${p.title}`;
+
+            // Stats
+            const pending = p.scenes.filter(
+              (s) => s.status === "pending"
+            ).length;
+            const completed = p.scenes.filter(
+              (s) => s.status === "completed" || s.status === "image_done"
+            ).length;
+            document.getElementById("detailStats").innerHTML = `
+              <div class="stat-box"><div class="stat-value">${
+                p.scenes.length
+              }</div><div class="stat-label">Toplam Sahne</div></div>
+              <div class="stat-box"><div class="stat-value">${
+                p.totalDuration
+              }s</div><div class="stat-label">Süre</div></div>
+              <div class="stat-box"><div class="stat-value">${pending}</div><div class="stat-label">Bekleyen</div></div>
+              <div class="stat-box"><div class="stat-value">${completed}</div><div class="stat-label">Tamamlanan</div></div>
+              <div class="stat-box"><div class="stat-value" style="color:${
+                p.status === "completed" ? "#4caf50" : "#ffc107"
+              }">${p.status}</div><div class="stat-label">Durum</div></div>
+            `;
+
+            // Scenes table
+            document.getElementById("scenesBody").innerHTML = p.scenes
+              .map(
+                (s) => `
+              <tr>
+                <td class="scene-num">${s.sceneNumber}</td>
+                <td>${s.timestamp}</td>
+                <td class="scene-text" title="${s.narration}">${
+                  s.narration
+                }</td>
+                <td class="scene-text" title="${s.subject}">${s.subject}</td>
+                <td>${
+                  s.imageUrl
+                    ? `<img src="${s.imageUrl}" class="scene-img" onclick="openModal('${s.imageUrl}')">`
+                    : '<span style="color:#606080">-</span>'
+                }</td>
+                <td>${
+                  s.audioUrl
+                    ? `<button class="audio-play-btn" onclick="playAudio('${s.audioUrl}')">🔊 Dinle</button>`
+                    : '<span class="no-video">-</span>'
+                }</td>
+                <td>${
+                  s.videoUrl
+                    ? `<button class="video-play-btn" onclick="openVideoModal('${s.videoUrl}')">▶️ Sessiz</button>`
+                    : '<span class="no-video">-</span>'
+                }</td>
+                <td>${
+                  s.mergedVideoUrl
+                    ? `<button class="video-play-btn" style="background: linear-gradient(135deg, #9c27b0 0%, #7b1fa2 100%);" onclick="openVideoModal('${s.mergedVideoUrl}')">▶️ Sesli</button>`
+                    : '<span class="no-video">-</span>'
+                }</td>
+                <td><span class="status-badge status-${s.status}">${
+                  s.status
+                }</span></td>
+              </tr>
+            `
+              )
+              .join("");
+            
+            // Final Video butonu göster/gizle
+            const finalVideoBtn = document.getElementById("finalVideoBtn");
+            if (p.finalVideoUrl) {
+              finalVideoBtn.style.display = "inline-flex";
+              finalVideoBtn.dataset.url = p.finalVideoUrl;
+            } else {
+              finalVideoBtn.style.display = "none";
+            }
+          }
+        } catch (error) {
+          document.getElementById("detailTitle").textContent = "Hata!";
+          document.getElementById(
+            "scenesBody"
+          ).innerHTML = `<tr><td colspan="6" style="text-align:center;padding:30px;color:#e57373">${error.message}</td></tr>`;
+        }
+      }
+
+      function goBack() {
+        document.getElementById("mainTabs").classList.remove("hidden");
+        document.getElementById("tab-detail").classList.add("hidden");
+        document.getElementById("tab-projects").classList.remove("hidden");
+        document
+          .querySelectorAll(".tab")
+          .forEach((t) => t.classList.remove("active"));
+        document.querySelector('[data-tab="projects"]').classList.add("active");
+        loadProjects();
+      }
+
+      let currentProjectId = null;
+
+      // Generate all images
+      async function generateAllImages() {
+        if (!currentProjectId) return;
+
+        const btn = document.getElementById("generateAllBtn");
+        const progress = document.getElementById("generateProgress");
+
+        btn.disabled = true;
+        btn.innerHTML = '<div class="spinner"></div><span>İşleniyor...</span>';
+        progress.classList.remove("hidden");
+
+        try {
+          const response = await fetch(
+            `/api/projects/${currentProjectId}/generate-all`,
+            { method: "POST" }
+          );
+          const result = await response.json();
+
+          if (result.success) {
+            document.getElementById(
+              "progressText"
+            ).textContent = `✅ Tamamlandı! ${result.processed} başarılı, ${result.failed} başarısız.`;
+            setTimeout(() => refreshProject(), 1000);
+          } else {
+            document.getElementById(
+              "progressText"
+            ).textContent = `❌ Hata: ${result.error}`;
+          }
+        } catch (error) {
+          document.getElementById(
+            "progressText"
+          ).textContent = `❌ Hata: ${error.message}`;
+        } finally {
+          btn.disabled = false;
+          btn.innerHTML = "🎨 Tüm Görselleri Oluştur";
+          setTimeout(() => progress.classList.add("hidden"), 3000);
+        }
+      }
+
+      // Refresh current project
+      function refreshProject() {
+        if (currentProjectId) viewProject(currentProjectId);
+      }
+
+      function formatJson() {
+        const input = document.getElementById("jsonInput");
+        try {
+          input.value = JSON.stringify(JSON.parse(input.value), null, 2);
+        } catch (e) {
+          alert("Geçersiz JSON: " + e.message);
+        }
+      }
+      function clearInput() {
+        document.getElementById("jsonInput").value = "";
+        document.getElementById("createMessage").className = "message";
+      }
+      function showMessage(el, type, text) {
+        el.className = `message ${type}`;
+        el.textContent = text;
+      }
+
+      // Modal functions
+      function openModal(imageUrl) {
+        document.getElementById("modalImage").src = imageUrl;
+        document.getElementById("imageModal").classList.add("active");
+        document.body.style.overflow = "hidden";
+      }
+      function closeModal() {
+        document.getElementById("imageModal").classList.remove("active");
+        document.body.style.overflow = "auto";
+      }
+
+      // Video Modal functions
+      function openVideoModal(videoUrl) {
+        const video = document.getElementById("modalVideo");
+        video.src = videoUrl;
+        document.getElementById("videoModal").classList.add("active");
+        document.body.style.overflow = "hidden";
+        video.play();
+      }
+      function closeVideoModal() {
+        const video = document.getElementById("modalVideo");
+        video.pause();
+        video.src = "";
+        document.getElementById("videoModal").classList.remove("active");
+        document.body.style.overflow = "auto";
+      }
+      
+      // Final Video aç
+      function openFinalVideo() {
+        const btn = document.getElementById("finalVideoBtn");
+        const url = btn.dataset.url;
+        if (url) {
+          openVideoModal(url);
+        }
+      }
+
+      // Audio player
+      let currentAudio = null;
+      function playAudio(audioUrl) {
+        // Önceki sesi durdur
+        if (currentAudio) {
+          currentAudio.pause();
+          currentAudio = null;
+        }
+        // Yeni sesi çal
+        currentAudio = new Audio(audioUrl);
+        currentAudio.play();
+        currentAudio.onended = () => {
+          currentAudio = null;
+        };
+      }
+
+      // Generate all audio
+      async function generateAllAudio() {
+        if (!currentProjectId) return;
+
+        const btn = document.getElementById("generateAudioBtn");
+        const progress = document.getElementById("generateProgress");
+
+        btn.disabled = true;
+        btn.innerHTML = '<div class="spinner"></div><span>Sesler Oluşturuluyor...</span>';
+        progress.classList.remove("hidden");
+        document.getElementById("progressText").textContent = "Sesler oluşturuluyor, lütfen bekleyin...";
+
+        try {
+          const response = await fetch(
+            `/api/projects/${currentProjectId}/generate-audio`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ voice: "walter", temperature: 0.8 }),
+            }
+          );
+          const result = await response.json();
+
+          if (result.success) {
+            document.getElementById("progressText").textContent =
+              `✅ Tamamlandı! ${result.processed} ses oluşturuldu.`;
+            setTimeout(() => refreshProject(), 1000);
+          } else {
+            document.getElementById("progressText").textContent = `❌ Hata: ${result.error}`;
+          }
+        } catch (error) {
+          document.getElementById("progressText").textContent = `❌ Hata: ${error.message}`;
+        } finally {
+          btn.disabled = false;
+          btn.innerHTML = "🎙️ Tüm Sesleri Oluştur";
+          setTimeout(() => progress.classList.add("hidden"), 3000);
+        }
+      }
+
+      // Generate all videos (sessiz)
+      async function generateAllVideos() {
+        if (!currentProjectId) return;
+
+        const btn = document.getElementById("generateVideoBtn");
+        const progress = document.getElementById("generateProgress");
+
+        btn.disabled = true;
+        btn.innerHTML = '<div class="spinner"></div><span>Videolar Oluşturuluyor...</span>';
+        progress.classList.remove("hidden");
+        document.getElementById("progressText").textContent = "Videolar oluşturuluyor, lütfen bekleyin...";
+
+        try {
+          const response = await fetch(
+            `/api/projects/${currentProjectId}/generate-videos?sync=true`,
+            { method: "POST" }
+          );
+          const result = await response.json();
+
+          if (result.success) {
+            document.getElementById("progressText").textContent =
+              `✅ Tamamlandı! ${result.processed} video oluşturuldu.`;
+            setTimeout(() => refreshProject(), 1000);
+          } else {
+            document.getElementById("progressText").textContent = `❌ Hata: ${result.error}`;
+          }
+        } catch (error) {
+          document.getElementById("progressText").textContent = `❌ Hata: ${error.message}`;
+        } finally {
+          btn.disabled = false;
+          btn.innerHTML = "🎬 Tüm Videoları Oluştur";
+          setTimeout(() => progress.classList.add("hidden"), 3000);
+        }
+      }
+
+      // Merge all videos (video + ses)
+      async function mergeAllVideos() {
+        if (!currentProjectId) return;
+
+        const btn = document.getElementById("mergeBtn");
+        const progress = document.getElementById("generateProgress");
+
+        btn.disabled = true;
+        btn.innerHTML = '<div class="spinner"></div><span>Birleştiriliyor...</span>';
+        progress.classList.remove("hidden");
+        document.getElementById("progressText").textContent = "Video + Ses birleştiriliyor, lütfen bekleyin...";
+
+        try {
+          const response = await fetch(
+            `/api/projects/${currentProjectId}/merge-videos`,
+            { method: "POST" }
+          );
+          const result = await response.json();
+
+          if (result.success) {
+            document.getElementById("progressText").textContent =
+              `✅ Tamamlandı! ${result.processed} video birleştirildi.`;
+            setTimeout(() => refreshProject(), 1000);
+          } else {
+            document.getElementById("progressText").textContent = `❌ Hata: ${result.error}`;
+          }
+        } catch (error) {
+          document.getElementById("progressText").textContent = `❌ Hata: ${error.message}`;
+        } finally {
+          btn.disabled = false;
+          btn.innerHTML = "🔗 Birleştir";
+          setTimeout(() => progress.classList.add("hidden"), 3000);
+        }
+      }
+
+      // Concatenate Final Video (sadece mevcut mergedVideoUrl'leri birleştir)
+      async function concatenateFinal() {
+        if (!currentProjectId) return;
+
+        const btn = document.getElementById("concatBtn");
+        const progress = document.getElementById("generateProgress");
+
+        btn.disabled = true;
+        btn.innerHTML = '<div class="spinner"></div><span>Birleştiriliyor...</span>';
+        progress.classList.remove("hidden");
+        document.getElementById("progressText").textContent = "Final video oluşturuluyor, lütfen bekleyin...";
+
+        try {
+          const response = await fetch(
+            `/api/projects/${currentProjectId}/concatenate-final`,
+            { method: "POST" }
+          );
+          const result = await response.json();
+
+          if (result.success) {
+            document.getElementById("progressText").textContent =
+              `✅ Final video oluşturuldu!`;
+            setTimeout(() => refreshProject(), 1000);
+          } else {
+            document.getElementById("progressText").textContent = `❌ Hata: ${result.error}`;
+          }
+        } catch (error) {
+          document.getElementById("progressText").textContent = `❌ Hata: ${error.message}`;
+        } finally {
+          btn.disabled = false;
+          btn.innerHTML = "📦 Tümünü Birleştir";
+          setTimeout(() => progress.classList.add("hidden"), 3000);
+        }
+      }
+
+      // Run full pipeline
+      async function runFullPipeline() {
+        if (!currentProjectId) return;
+
+        const btn = document.getElementById("pipelineBtn");
+        const progress = document.getElementById("generateProgress");
+
+        btn.disabled = true;
+        btn.innerHTML = '<div class="spinner"></div><span>Çalışıyor...</span>';
+        progress.classList.remove("hidden");
+        document.getElementById("progressText").textContent = "🚀 Tam akış başlatıldı... Resim → Ses → Video → Birleştirme";
+
+        try {
+          const response = await fetch(
+            `/api/projects/${currentProjectId}/generate-pipeline`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ voice: "walter", temperature: 0.8 }),
+            }
+          );
+          const result = await response.json();
+
+          if (result.success) {
+            const r = result.results;
+            document.getElementById("progressText").textContent =
+              `✅ Tamamlandı! Görseller: ${r.images.processed}, Sesler: ${r.audio.processed}, Videolar: ${r.videos.processed}, Birleştirme: ${r.merge.processed}`;
+            setTimeout(() => refreshProject(), 1000);
+          } else {
+            document.getElementById("progressText").textContent = `❌ Hata: ${result.error}`;
+          }
+        } catch (error) {
+          document.getElementById("progressText").textContent = `❌ Hata: ${error.message}`;
+        } finally {
+          btn.disabled = false;
+          btn.innerHTML = "🚀 Tam Akış Başlat";
+          setTimeout(() => progress.classList.add("hidden"), 5000);
+        }
+      }
+
+      // ESC key to close modals
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") {
+          closeModal();
+          closeVideoModal();
+        }
+      });
+    </script>
+  </body>
+</html>
+
+

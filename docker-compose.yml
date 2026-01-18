@@ -1,0 +1,35 @@
+version: "3.8"
+
+services:
+  # Node.js Backend (Ana API)
+  backend:
+    build: ./yt-auto-video
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - FAL_KEY=${FAL_KEY}
+      - R2_ACCOUNT_ID=${R2_ACCOUNT_ID}
+      - R2_ACCESS_KEY_ID=${R2_ACCESS_KEY_ID}
+      - R2_SECRET_ACCESS_KEY=${R2_SECRET_ACCESS_KEY}
+      - R2_BUCKET_NAME=${R2_BUCKET_NAME}
+      - PORT=3000
+      # Docker içi Python servisine erişim (servis adı: port)
+      - PYTHON_API_URL=http://video-api:8000
+    depends_on:
+      - video-api
+
+  # Python Video API
+  video-api:
+    build: ./yt-video
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - R2_ACCOUNT_ID=${R2_ACCOUNT_ID}
+      - R2_ACCESS_KEY_ID=${R2_ACCESS_KEY_ID}
+      - R2_SECRET_ACCESS_KEY=${R2_SECRET_ACCESS_KEY}
+      - R2_BUCKET_NAME=${R2_BUCKET_NAME}
+      - R2_PUBLIC_URL=${R2_PUBLIC_URL}
+      - FAL_KEY=${FAL_KEY}
+      - IMAGEMAGICK_BINARY=/usr/bin/convert

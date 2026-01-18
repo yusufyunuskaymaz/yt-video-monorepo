@@ -1,0 +1,23 @@
+# Genel
+.DS_Store
+.env
+*.log
+
+# Node.js (yt-auto-video)
+yt-auto-video/node_modules/
+yt-auto-video/npm-debug.log
+yt-auto-video/dist/
+yt-auto-video/temp/
+
+# Python (yt-video)
+yt-video/__pycache__/
+yt-video/*.pyc
+yt-video/venv/
+yt-video/.venv/
+yt-video/env/
+yt-video/temp_videos/
+yt-video/.pytest_cache/
+
+# Logs
+logs/
+performance.log
