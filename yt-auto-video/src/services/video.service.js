@@ -20,12 +20,15 @@ async function requestVideoGeneration({
   duration = 10,
   panDirection = "vertical",
   subtitles = null,
+  projectId = null,
+  sceneNumber = null,
 }) {
   console.log(`\n🎬 Video üretim isteği gönderiliyor...`);
   console.log(`   Scene ID: ${sceneId}`);
   console.log(`   Image URL: ${imageUrl}`);
   console.log(`   Duration: ${duration}s`);
   console.log(`   Direction: ${panDirection}`);
+  if (projectId) console.log(`   Project ID: ${projectId}`);
 
   try {
     const response = await axios.post(`${PYTHON_API_URL}/api/video/generate`, {
@@ -35,6 +38,8 @@ async function requestVideoGeneration({
       pan_direction: panDirection,
       subtitles: subtitles,
       callback_url: `${NODE_CALLBACK_URL}`,
+      project_id: projectId,
+      scene_number: sceneNumber,
     });
 
     console.log(`✅ Video üretim isteği gönderildi!`);
@@ -65,6 +70,8 @@ async function generateVideoSync({
   duration = 10,
   panDirection = "vertical",
   subtitles = null,
+  projectId = null,
+  sceneNumber = null,
 }) {
   console.log(`\n🎬 Video üretimi başlatılıyor (sync)...`);
 
@@ -77,6 +84,8 @@ async function generateVideoSync({
         duration: duration,
         pan_direction: panDirection,
         subtitles: subtitles,
+        project_id: projectId,
+        scene_number: sceneNumber,
       },
       { timeout: 180000 } // 3 dakika timeout
     );
@@ -124,6 +133,8 @@ async function mergeVideoWithAudio({
   audioUrl,
   sceneId,
   narration = null,
+  projectId = null,
+  sceneNumber = null,
 }) {
   console.log(`\n🔗 Video + Ses birleştirme isteği gönderiliyor...`);
   console.log(`   Scene ID: ${sceneId}`);
@@ -139,6 +150,8 @@ async function mergeVideoWithAudio({
         audio_url: audioUrl,
         scene_id: sceneId,
         narration: narration,
+        project_id: projectId,
+        scene_number: sceneNumber,
       },
       { timeout: 600000 } // 10 dakika timeout (altyazı ekleme uzun sürebilir)
     );

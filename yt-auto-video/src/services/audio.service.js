@@ -26,6 +26,8 @@ async function generateAudio({
   sceneId,
   voice = "walter",
   temperature = 0.8,
+  projectId = null,
+  sceneNumber = null,
 }) {
   console.log(`\n🎙️ ========== TTS GENERATION ==========`);
   console.log(`📝 Text: ${text.substring(0, 50)}...`);
@@ -52,7 +54,7 @@ async function generateAudio({
         },
       }
     );
-    endTimer(ttsTimer, { scene: sceneId });
+    endTimer(ttsTimer, { scene: sceneNumber, projectId: projectId });
 
     console.log("✅ Ses başarıyla üretildi!");
 
@@ -62,7 +64,12 @@ async function generateAudio({
 
     // R2'ye yükle - süreyi ölç
     const audioId = generateId();
-    const fileName = `audio/${sceneId}_${audioId}.mp3`;
+    const fileName = projectId
+      ? `audio/${projectId}_scene_${String(sceneNumber).padStart(
+          3,
+          "0"
+        )}_${audioId}.mp3`
+      : `audio/${sceneId}_${audioId}.mp3`;
 
     console.log("☁️ R2 CDN'e yükleniyor...");
     const r2Timer = startTimer("R2_AUDIO_UPLOAD");
@@ -71,7 +78,7 @@ async function generateAudio({
       fileName,
       "audio/mpeg"
     );
-    endTimer(r2Timer, { scene: sceneId });
+    endTimer(r2Timer, { scene: sceneNumber, projectId: projectId });
 
     console.log("\n🎉 ========== AUDIO CDN URL ==========");
     console.log("🔗", cdnUrl);

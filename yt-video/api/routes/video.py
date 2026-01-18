@@ -24,19 +24,23 @@ class SubtitleItem(BaseModel):
 
 class GenerateVideoRequest(BaseModel):
     image_url: str
-    scene_id: str | int  # String veya Int kabul et
+    scene_id: str | int
     duration: Optional[int] = 10
-    pan_direction: Optional[str] = "vertical"  # "horizontal" veya "vertical" (default: aşağıdan yukarı)
+    pan_direction: Optional[str] = "vertical"
     subtitles: Optional[List[SubtitleItem]] = None
     callback_url: Optional[str] = None
+    project_id: Optional[str | int] = None
+    scene_number: Optional[int] = None
 
 
 class MergeVideoAudioRequest(BaseModel):
     video_url: str
     audio_url: str
-    scene_id: str | int  # String veya Int kabul et
-    narration: Optional[str] = None  # Altyazı metni
+    scene_id: str | int
+    narration: Optional[str] = None
     callback_url: Optional[str] = None
+    project_id: Optional[str | int] = None
+    scene_number: Optional[int] = None
 
 
 class GenerateVideoResponse(BaseModel):
@@ -52,7 +56,9 @@ def process_video_task(
     duration: int,
     pan_direction: str,
     subtitles: list,
-    callback_url: str
+    callback_url: str,
+    project_id: str = None,
+    scene_number: int = None
 ):
     """Arka planda video işle ve callback yap"""
     print(f"\n🔄 Background task başlatıldı: {scene_id}")
@@ -68,7 +74,9 @@ def process_video_task(
         scene_id=scene_id,
         duration=duration,
         pan_direction=pan_direction,
-        subtitles=subtitle_dicts
+        subtitles=subtitle_dicts,
+        project_id=project_id,
+        scene_number=scene_number
     )
     
     # Callback yap (Node.js'e haber ver)
@@ -92,15 +100,7 @@ def process_video_task(
 # Endpoints
 @router.post("/generate", response_model=GenerateVideoResponse)
 async def generate_video(request: GenerateVideoRequest, background_tasks: BackgroundTasks):
-    """
-    Video üretimini başlat (async)
-    
-    - Resmi indirir
-    - Ken Burns efekti ile video oluşturur
-    - Opsiyonel olarak altyazı ekler
-    - CDN'e yükler
-    - Callback URL'e sonucu bildirir
-    """
+    """Video üretimini başlat (async)"""
     if not request.image_url:
         raise HTTPException(status_code=400, detail="image_url gerekli")
     
@@ -115,7 +115,9 @@ async def generate_video(request: GenerateVideoRequest, background_tasks: Backgr
         request.duration,
         request.pan_direction,
         request.subtitles,
-        request.callback_url
+        request.callback_url,
+        str(request.project_id) if request.project_id else None,
+        request.scene_number
     )
     
     return GenerateVideoResponse(
@@ -127,10 +129,7 @@ async def generate_video(request: GenerateVideoRequest, background_tasks: Backgr
 
 @router.post("/generate-sync")
 async def generate_video_sync(request: GenerateVideoRequest):
-    """
-    Video üretimini senkron çalıştır (test için)
-    İşlem bitene kadar bekler ve sonucu döner
-    """
+    """Video üretimini senkron çalıştır (test için)"""
     if not request.image_url:
         raise HTTPException(status_code=400, detail="image_url gerekli")
     
@@ -148,7 +147,9 @@ async def generate_video_sync(request: GenerateVideoRequest):
         scene_id=request.scene_id,
         duration=request.duration,
         pan_direction=request.pan_direction,
-        subtitles=subtitle_dicts
+        subtitles=subtitle_dicts,
+        project_id=str(request.project_id) if request.project_id else None,
+        scene_number=request.scene_number
     )
     
     return result
@@ -156,14 +157,7 @@ async def generate_video_sync(request: GenerateVideoRequest):
 
 @router.post("/merge-video-audio")
 async def merge_video_audio_endpoint(request: MergeVideoAudioRequest):
-    """
-    Sessiz video ile sesi birleştir (senkron)
-    
-    - Sessiz videoyu indirir
-    - Sesi indirir
-    - Birleştirir
-    - CDN'e yükler
-    """
+    """Sessiz video ile sesi birleştir (senkron)"""
     if not request.video_url:
         raise HTTPException(status_code=400, detail="video_url gerekli")
     
@@ -178,7 +172,9 @@ async def merge_video_audio_endpoint(request: MergeVideoAudioRequest):
         video_url=request.video_url,
         audio_url=request.audio_url,
         scene_id=request.scene_id,
-        narration=request.narration
+        narration=request.narration,
+        project_id=str(request.project_id) if request.project_id else None,
+        scene_number=request.scene_number
     )
     
     return result

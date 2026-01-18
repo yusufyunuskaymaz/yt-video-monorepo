@@ -98,7 +98,7 @@ async function generateImage({ prompt: promptData, projectId, sceneNumber }) {
         }
       },
     });
-    endTimer(falTimer, { scene: sceneNumber });
+    endTimer(falTimer, { scene: sceneNumber, projectId: projectId });
 
     console.log("✅ Resim başarıyla üretildi!");
 
@@ -122,7 +122,7 @@ async function generateImage({ prompt: promptData, projectId, sceneNumber }) {
       fileName,
       "image/jpeg"
     );
-    endTimer(r2Timer, { scene: sceneNumber });
+    endTimer(r2Timer, { scene: sceneNumber, projectId: projectId });
 
     console.log("\n🎉 ========== CDN URL ==========");
     console.log("🔗", cdnUrl);

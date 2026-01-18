@@ -170,29 +170,98 @@ def get_summary():
     }
 
 
+def get_project_stats(project_id=None):
+    """
+    Proje bazlı detaylı istatistikleri getirir
+
+    Args:
+        project_id: Proje ID'sine göre filtrele (opsiyonel)
+
+    Returns:
+        dict: Proje ve sahne bazlı istatistikler
+    """
+    if not os.path.exists(LOG_FILE):
+        return {'projects': {}}
+
+    with open(LOG_FILE, 'r') as f:
+        content = f.read()
+
+    lines = [l for l in content.strip().split('\n') if l]
+    entries = [json.loads(l) for l in lines]
+
+    projects = {}
+
+    for entry in entries:
+        # Proje ID'si yoksa veya filtreye uymuyorsa atla
+        if 'project_id' not in entry or entry['project_id'] is None:
+            continue
+        if project_id and str(entry['project_id']) != str(project_id):
+            continue
+
+        p_id = str(entry['project_id'])
+
+        if p_id not in projects:
+            projects[p_id] = {
+                'projectId': p_id,
+                'totalDuration': 0,
+                'scenes': {},
+                'general': []  # Sahneye bağlı olmayan işlemler
+            }
+
+        project = projects[p_id]
+        project['totalDuration'] += entry['duration_ms']
+
+        if 'scene_number' in entry and entry['scene_number'] is not None:
+            scene_num = str(entry['scene_number'])
+            if scene_num not in project['scenes']:
+                project['scenes'][scene_num] = {
+                    'operations': [],
+                    'totalSceneDuration': 0
+                }
+            project['scenes'][scene_num]['operations'].append({
+                'operation': entry['operation'],
+                'duration_sec': entry['duration_sec'],
+                'timestamp': entry['timestamp'],
+                'status': entry['status']
+            })
+            project['scenes'][scene_num]['totalSceneDuration'] += entry['duration_ms']
+        else:
+            project['general'].append({
+                'operation': entry['operation'],
+                'duration_sec': entry['duration_sec'],
+                'timestamp': entry['timestamp'],
+                'status': entry['status']
+            })
+
+    return {
+        'count': len(projects),
+        'projects': projects
+    }
+
+
 def print_summary():
     """Özet tablosu yazdır"""
     summary = get_summary()
-    
+
     print("\n" + "=" * 60)
     print("📊 PERFORMANCE SUMMARY")
     print("=" * 60)
-    
+
     if not summary['operations']:
         print("Henüz kayıt yok.")
         return
-    
+
     # Ortalamaya göre sırala (en yavaştan en hızlıya)
     sorted_ops = sorted(
         summary['operations'].items(),
         key=lambda x: x[1]['avg_ms'],
         reverse=True
     )
-    
+
     print(f"{'İşlem':<35} {'Ort':<10} {'Min':<10} {'Max':<10} {'Sayı':<6}")
     print("-" * 60)
-    
+
     for op, stats in sorted_ops:
         print(f"{op:<35} {stats['avg_sec']:<10}s {stats['min_sec']:<10}s {stats['max_sec']:<10}s {stats['count']:<6}")
-    
+
     print("=" * 60 + "\n")

@@ -14,6 +14,7 @@ from config import API_PORT
 
 # Routes
 from routes.video import router as video_router
+from routes.performance import router as performance_router
 
 # FastAPI App
 app = FastAPI(
@@ -33,6 +34,7 @@ app.add_middleware(
 
 # Routes
 app.include_router(video_router)
+app.include_router(performance_router)
 
 
 # Root endpoint
@@ -44,7 +46,12 @@ async def root():
         "endpoints": {
             "generate_async": "POST /api/video/generate",
             "generate_sync": "POST /api/video/generate-sync",
-            "health": "GET /api/video/health"
+            "merge_video_audio": "POST /api/video/merge-video-audio",
+            "health": "GET /api/video/health",
+            "performance_summary": "GET /api/performance/summary",
+            "performance_project": "GET /api/performance/project/{id}",
+            "performance_all": "GET /api/performance/projects",
+            "performance_clear": "POST /api/performance/clear"
         }
     }
 

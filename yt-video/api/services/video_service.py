@@ -50,40 +50,33 @@ def process_video(
     scene_id: str,
     duration: int = 10,
     pan_direction: str = "horizontal",
-    subtitles: list = None
+    subtitles: list = None,
+    project_id: str = None,
+    scene_number: int = None
 ) -> dict:
     """
     Resimden video oluştur ve CDN'e yükle
-    
-    Args:
-        image_url: Kaynak resim URL'i
-        scene_id: Sahne ID
-        duration: Video süresi (saniye)
-        pan_direction: Pan yönü ("horizontal" veya "vertical")
-        subtitles: Altyazı listesi (opsiyonel)
-        
-    Returns:
-        {
-            "success": True,
-            "video_url": "https://cdn.../video.mp4",
-            "scene_id": "..."
-        }
     """
     print(f"\n🎬 ========== VIDEO İŞLEME BAŞLADI ==========")
     print(f"📷 Resim URL: {image_url}")
     print(f"🎯 Scene ID: {scene_id}")
     print(f"⏱️ Süre: {duration}s")
     print(f"➡️ Yön: {pan_direction}")
+    if project_id: print(f"📁 Proje ID: {project_id}")
+    if scene_number: print(f"🎬 Sahne No: {scene_number}")
     print(f"================================================\n")
     
     # Geçici klasör oluştur
     temp_dir = tempfile.mkdtemp(prefix="video_")
     
     try:
+        # Metada for logging
+        meta = {"scene_id": scene_id, "project_id": project_id, "scene_number": scene_number}
+
         # 1. Resmi indir
         image_ext = os.path.splitext(urlparse(image_url).path)[1] or ".jpg"
         image_path = os.path.join(temp_dir, f"input{image_ext}")
-        with Timer("PY_IMAGE_DOWNLOAD", {"scene_id": scene_id}):
+        with Timer("PY_IMAGE_DOWNLOAD", meta):
             download_image(image_url, image_path)
         
         # 2. Video oluştur
@@ -99,7 +92,7 @@ def process_video(
         else:
             pan_dir = pan_direction
         
-        with Timer("PY_KEN_BURNS_VIDEO", {"scene_id": scene_id, "duration": duration}):
+        with Timer("PY_KEN_BURNS_VIDEO", {**meta, "duration": duration}):
             create_ken_burns_video(
                 image_path=image_path,
                 output_path=video_path,
@@ -112,13 +105,13 @@ def process_video(
         if subtitles and len(subtitles) > 0:
             print(f"\n📝 Altyazılar ekleniyor...")
             subtitled_path = os.path.join(temp_dir, "output_subtitled.mp4")
-            with Timer("PY_ADD_SUBTITLES", {"scene_id": scene_id}):
+            with Timer("PY_ADD_SUBTITLES", meta):
                 add_timed_subtitles(video_path, subtitles, subtitled_path)
             video_path = subtitled_path
         
         # 4. CDN'e yükle
         print(f"\n☁️ CDN'e yükleniyor...")
-        with Timer("PY_CDN_VIDEO_UPLOAD", {"scene_id": scene_id}):
+        with Timer("PY_CDN_VIDEO_UPLOAD", meta):
             cdn_url = upload_video(video_path, scene_id)
         
         print(f"\n🎉 ========== VIDEO TAMAMLANDI ==========")
@@ -164,23 +157,12 @@ def merge_video_with_audio(
     video_url: str,
     audio_url: str,
     scene_id: str,
-    narration: str = None
+    narration: str = None,
+    project_id: str = None,
+    scene_number: int = None
 ) -> dict:
     """
     Sessiz video ile sesi birleştir, altyazı ekle ve CDN'e yükle
-    
-    Args:
-        video_url: Sessiz video URL'i
-        audio_url: Ses URL'i
-        scene_id: Sahne ID
-        narration: Altyazı metni (opsiyonel)
-        
-    Returns:
-        {
-            "success": True,
-            "merged_video_url": "https://cdn.../merged_video.mp4",
-            "duration": 10.5
-        }
     """
     from moviepy import VideoFileClip, AudioFileClip
     from services.subtitle_service import add_karaoke_subtitles
@@ -190,19 +172,24 @@ def merge_video_with_audio(
     print(f"🔊 Audio URL: {audio_url}")
     print(f"🎯 Scene ID: {scene_id}")
     print(f"📝 Altyazı: {'Var' if narration else 'Yok'}")
+    if project_id: print(f"📁 Proje ID: {project_id}")
+    if scene_number: print(f"🎬 Sahne No: {scene_number}")
     print(f"=================================================\n")
     
     temp_dir = tempfile.mkdtemp(prefix="merge_")
     
     try:
+        # Metada for logging
+        meta = {"scene_id": scene_id, "project_id": project_id, "scene_number": scene_number}
+
         # 1. Video indir
         video_path = os.path.join(temp_dir, "video.mp4")
-        with Timer("PY_MERGE_VIDEO_DOWNLOAD", {"scene_id": scene_id}):
+        with Timer("PY_MERGE_VIDEO_DOWNLOAD", meta):
             download_file(video_url, video_path)
         
         # 2. Ses indir
         audio_path = os.path.join(temp_dir, "audio.mp3")
-        with Timer("PY_MERGE_AUDIO_DOWNLOAD", {"scene_id": scene_id}):
+        with Timer("PY_MERGE_AUDIO_DOWNLOAD", meta):
             download_file(audio_url, audio_path)
         
         # 3. Video ve sesi yükle
@@ -225,7 +212,7 @@ def merge_video_with_audio(
         merged_path = os.path.join(temp_dir, "merged.mp4")
         print(f"💾 Kaydediliyor: {merged_path}")
         
-        with Timer("PY_MOVIEPY_WRITE_VIDEO", {"scene_id": scene_id}):
+        with Timer("PY_MOVIEPY_WRITE_VIDEO", meta):
             final_video.write_videofile(
                 merged_path,
                 codec='libx264',
@@ -244,7 +231,7 @@ def merge_video_with_audio(
         if narration and len(narration.strip()) > 0:
             print(f"\n📝 Altyazı ekleniyor...")
             subtitled_path = os.path.join(temp_dir, "merged_subtitled.mp4")
-            with Timer("PY_KARAOKE_SUBTITLES", {"scene_id": scene_id}):
+            with Timer("PY_KARAOKE_SUBTITLES", meta):
                 output_path = add_karaoke_subtitles(
                     video_path=merged_path,
                     text=narration,
@@ -258,7 +245,7 @@ def merge_video_with_audio(
         print(f"\n☁️ CDN'e yükleniyor...")
         import time
         timestamp = int(time.time())
-        with Timer("PY_CDN_MERGED_UPLOAD", {"scene_id": scene_id}):
+        with Timer("PY_CDN_MERGED_UPLOAD", meta):
             cdn_url = upload_video(output_path, f"merged_{scene_id}")
         
         print(f"\n🎉 ========== BİRLEŞTİRME TAMAMLANDI ==========")

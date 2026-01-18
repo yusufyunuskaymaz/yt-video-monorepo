@@ -130,11 +130,81 @@ function getSummary() {
   };
 }
 
+/**
+ * Proje bazlı detaylı istatistikleri getirir
+ * @param {string} projectId - Proje ID'sine göre filtrele (opsiyonel)
+ * @returns {object} Proje ve sahne bazlı istatistikler
+ */
+function getProjectStats(projectId = null) {
+  if (!fs.existsSync(LOG_FILE)) {
+    return { projects: {} };
+  }
+
+  const content = fs.readFileSync(LOG_FILE, "utf-8");
+  const entries = content
+    .trim()
+    .split("\n")
+    .filter((l) => l)
+    .map((l) => JSON.parse(l));
+
+  const projects = {};
+
+  entries.forEach((entry) => {
+    // Proje ID'si yoksa veya filtreye uymuyorsa atla
+    if (!entry.projectId) return;
+    if (projectId && String(entry.projectId) !== String(projectId)) return;
+
+    const pId = String(entry.projectId);
+
+    if (!projects[pId]) {
+      projects[pId] = {
+        projectId: pId,
+        totalDuration: 0,
+        scenes: {},
+        general: [], // Sahneye bağlı olmayan işlemler (örn: final concat)
+      };
+    }
+
+    const project = projects[pId];
+    project.totalDuration += entry.duration_ms;
+
+    if (entry.scene !== undefined) {
+      const sceneNum = String(entry.scene);
+      if (!project.scenes[sceneNum]) {
+        project.scenes[sceneNum] = {
+          operations: [],
+          totalSceneDuration: 0,
+        };
+      }
+      project.scenes[sceneNum].operations.push({
+        operation: entry.operation,
+        duration_sec: entry.duration_sec,
+        timestamp: entry.timestamp,
+        status: entry.status,
+      });
+      project.scenes[sceneNum].totalSceneDuration += entry.duration_ms;
+    } else {
+      project.general.push({
+        operation: entry.operation,
+        duration_sec: entry.duration_sec,
+        timestamp: entry.timestamp,
+        status: entry.status,
+      });
+    }
+  });
+
+  return {
+    count: Object.keys(projects).length,
+    projects: projects,
+  };
+}
+
 module.exports = {
   startTimer,
   endTimer,
   measureAsync,
   clearLog,
   getSummary,
+  getProjectStats,
   LOG_FILE,
 };

@@ -296,6 +296,8 @@ async function generateAllVideos(req, res) {
           sceneId: scene.id,
           duration: 10,
           panDirection: "vertical",
+          projectId: id,
+          sceneNumber: scene.sceneNumber,
         });
 
         if (result.success) {
@@ -342,6 +344,8 @@ async function generateAllVideos(req, res) {
           sceneId: scene.id,
           duration: 10,
           panDirection: "vertical",
+          projectId: id,
+          sceneNumber: scene.sceneNumber,
         });
       }
 
@@ -419,6 +423,8 @@ async function generateAllAudio(req, res) {
           sceneId: scene.id,
           voice: voice,
           temperature: temperature,
+          projectId: id,
+          sceneNumber: scene.sceneNumber,
         });
 
         if (result.success) {
@@ -536,6 +542,8 @@ async function mergeAllVideos(req, res) {
           audioUrl: scene.audioUrl,
           sceneId: scene.id,
           narration: scene.narration, // Altyazı için metin
+          projectId: id,
+          sceneNumber: scene.sceneNumber,
         });
 
         if (result.success) {
@@ -673,6 +681,8 @@ async function generateFullPipeline(req, res) {
           sceneId: scene.id,
           voice,
           temperature,
+          projectId: id,
+          sceneNumber: scene.sceneNumber,
         });
         if (audioResult && audioResult.audioUrl) {
           await projectService.updateScene(scene.id, {
@@ -720,6 +730,8 @@ async function generateFullPipeline(req, res) {
             // Alternatif pan yönü: Tek sahneler yukarı, çift sahneler aşağı
             panDirection:
               scene.sceneNumber % 2 === 1 ? "vertical" : "vertical_reverse",
+            projectId: id,
+            sceneNumber: scene.sceneNumber,
           });
           if (videoResult.success) {
             await projectService.updateScene(scene.id, {
@@ -757,6 +769,8 @@ async function generateFullPipeline(req, res) {
             audioUrl: scene.audioUrl,
             sceneId: scene.id,
             narration: scene.narration,
+            projectId: id,
+            sceneNumber: scene.sceneNumber,
           });
           if (mergeResult.success) {
             await projectService.updateScene(scene.id, {

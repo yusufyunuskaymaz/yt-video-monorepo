@@ -49,6 +49,16 @@ router.get("/performance/summary", (req, res) => {
   });
 });
 
+// GET /api/projects/performance/project/:id - Proje bazlı detaylı rapor
+router.get("/performance/project/:id", (req, res) => {
+  const stats = timing.getProjectStats(req.params.id);
+  res.json({
+    success: true,
+    projectId: req.params.id,
+    stats,
+  });
+});
+
 // POST /api/projects/performance/clear - Logları temizle
 router.post("/performance/clear", (req, res) => {
   timing.clearLog();
