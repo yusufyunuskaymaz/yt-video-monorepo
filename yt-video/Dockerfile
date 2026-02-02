@@ -1,39 +1,45 @@
-FROM python:3.12-slim
+# GPU Video İşleme Servisi - RunPod için
+FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04
 
-# Sistem bağımlılıklarını yükle
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONUNBUFFERED=1
+
+# Sistem bağımlılıkları ve Python 3.12 için PPA ekleme
 RUN apt-get update && apt-get install -y \
+    software-properties-common \
+    && add-apt-repository ppa:deadsnakes/ppa \
+    && apt-get update && apt-get install -y \
+    python3.12 \
+    python3.12-venv \
+    python3.12-dev \
+    python3-pip \
     ffmpeg \
     imagemagick \
     libsm6 \
     libxext6 \
+    libgl1-mesa-glx \
     ghostscript \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
-# ImageMagick policy düzenlemesi (Versiyon bağımsız çözüm)
-# policy.xml dosyasını bul ve düzenle (6 veya 7 olabilir)
-RUN if [ -f /etc/ImageMagick-6/policy.xml ]; then \
-        sed -i 's/none/read,write/g' /etc/ImageMagick-6/policy.xml; \
-    elif [ -f /etc/ImageMagick-7/policy.xml ]; then \
-        sed -i 's/none/read,write/g' /etc/ImageMagick-7/policy.xml; \
-    elif [ -f /etc/ImageMagick/policy.xml ]; then \
-        sed -i 's/none/read,write/g' /etc/ImageMagick/policy.xml; \
-    fi
+# Python symlink düzenlemesi
+RUN ln -sf /usr/bin/python3.12 /usr/bin/python3 && \
+    ln -sf /usr/bin/python3 /usr/bin/python
 
-# Çalışma dizini
+# Pip güncellemesi (Python 3.12 ile uyum için)
+RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python3.12
+
 WORKDIR /app
 
-# Bağımlılıkları kopyala ve yükle
+# Python bağımlılıkları
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN python3 -m pip install --no-cache-dir -r requirements.txt
 
-# Uygulama kodlarını kopyala
+# Uygulama kodları
 COPY . .
 
-# Geçici klasörler için izinler
 RUN mkdir -p temp_videos && chmod 777 temp_videos
 
-# Port
 EXPOSE 8000
 
-# Çalıştırma komutu
 CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]

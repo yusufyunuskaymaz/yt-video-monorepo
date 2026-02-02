@@ -1,6 +1,6 @@
 # Genel
 .DS_Store
-.env
+
 *.log
 
 # Node.js (yt-auto-video)
@@ -21,3 +21,12 @@ yt-video/.pytest_cache/
 # Logs
 logs/
 performance.log
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Test files
+test.zip
+hata.txt

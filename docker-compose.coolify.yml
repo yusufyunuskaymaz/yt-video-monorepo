@@ -1,0 +1,64 @@
+# ========================================
+# Coolify Deployment: Node.js Backend + PostgreSQL
+# ========================================
+# Python Video API bu dosyada YOK - RunPod'da ayrı çalışacak
+# Coolify bu dosyayı otomatik olarak deploy edecek
+
+services:
+  # PostgreSQL Veritabanı
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-ai_voice_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB:-ai_video_generator}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-ai_voice_user} -d ${POSTGRES_DB:-ai_video_generator}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Node.js Backend (Ana API)
+  backend:
+    image: kaymazyusuf/backend_nodejs:latest
+    ports:
+      - "3000:3000"
+    environment:
+      # Database - Coolify internal network
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-ai_voice_user}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ai_video_generator}?schema=public
+
+      # Fal.ai
+      - FAL_KEY=${FAL_KEY}
+      - FAL_AI_API_KEY=${FAL_KEY}
+
+      # Cloudflare R2
+      - R2_ACCOUNT_ID=${R2_ACCOUNT_ID}
+      - R2_ENDPOINT=${R2_ENDPOINT}
+      - R2_ACCESS_KEY_ID=${R2_ACCESS_KEY_ID}
+      - R2_SECRET_ACCESS_KEY=${R2_SECRET_ACCESS_KEY}
+      - R2_BUCKET_NAME=${R2_BUCKET_NAME}
+      - R2_PUBLIC_URL=${R2_PUBLIC_URL}
+
+      # Server Config
+      - PORT=3000
+
+      # RunPod Python API (pod başlatınca URL'i al)
+      - PYTHON_API_URL=${RUNPOD_PYTHON_API_URL:-http://localhost:8000}
+
+      # Callback URL - Coolify'ın atadığı domain veya IP
+      - NODE_CALLBACK_URL=${NODE_CALLBACK_URL:-http://localhost:3000/webhook}
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    command: sh -c "npx prisma db push && npm run dev"
+
+volumes:
+  postgres_data:
