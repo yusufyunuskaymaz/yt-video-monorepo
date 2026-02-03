@@ -9,6 +9,9 @@ const PYTHON_API_URL = process.env.PYTHON_API_URL || "http://localhost:8000";
 const NODE_CALLBACK_URL =
   process.env.NODE_CALLBACK_URL || "http://localhost:3000/webhook/video-ready";
 
+// Debug log
+console.log(`🔗 Python API URL: ${PYTHON_API_URL}`);
+
 /**
  * Python API'ye video üretim isteği gönder (async - callback ile)
  * @param {object} params - { imageUrl, sceneId, duration, panDirection, subtitles }
