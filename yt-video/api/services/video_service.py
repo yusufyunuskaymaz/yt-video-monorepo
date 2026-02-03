@@ -525,10 +525,9 @@ def gpu_test_loop_videos(
         
         final_clip.write_videofile(
             output_path,
-            codec='h264_nvenc',  # NVIDIA GPU encoding
+            codec='h264_nvenc',  # NVIDIA GPU encoding (RTX 4090)
             audio_codec='aac',
-            preset='fast',
-            threads=4,
+            preset='p4',  # NVENC preset: p1-p7 (p4 = medium quality/speed)
             fps=30,
             logger='bar'
         )
