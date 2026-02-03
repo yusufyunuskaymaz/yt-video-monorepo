@@ -37,6 +37,9 @@ services:
       - PORT=3000
       - PYTHON_API_URL=http://video-api:8000
       - NODE_CALLBACK_URL=http://backend:3000/webhook
+    volumes:
+      - ./yt-auto-video/src:/app/src
+      - ./yt-auto-video/public:/app/public
     depends_on:
       postgres:
         condition: service_healthy
@@ -60,6 +63,8 @@ services:
       - FAL_KEY=${FAL_KEY}
       - NODE_CALLBACK_URL=http://backend:3000/webhook
       - IMAGEMAGICK_BINARY=/usr/bin/convert
+    volumes:
+      - ./yt-video/api:/app/api
 
 volumes:
   postgres_data:

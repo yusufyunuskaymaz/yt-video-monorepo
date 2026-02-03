@@ -47,6 +47,8 @@ async def root():
             "generate_async": "POST /api/video/generate",
             "generate_sync": "POST /api/video/generate-sync",
             "merge_video_audio": "POST /api/video/merge-video-audio",
+            "concatenate": "POST /api/video/concatenate",
+            "gpu_test": "POST /api/video/gpu-test",
             "health": "GET /api/video/health",
             "performance_summary": "GET /api/performance/summary",
             "performance_project": "GET /api/performance/project/{id}",

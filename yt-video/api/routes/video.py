@@ -208,6 +208,43 @@ async def concatenate_videos_endpoint(request: ConcatenateVideosRequest):
     return result
 
 
+# GPU Test Endpoint
+class GpuTestRequest(BaseModel):
+    video_urls: List[str]  # 3 CDN video URL (her biri ~10 saniye)
+    target_duration_seconds: int = 900  # Hedef süre (default: 15 dakika)
+    test_name: Optional[str] = "gpu_test"  # Test adı
+
+
+@router.post("/gpu-test")
+async def gpu_test_endpoint(request: GpuTestRequest):
+    """
+    🧪 RunPod GPU Test Endpoint
+    
+    Hazır video sahnelerini alır, hedef süreye ulaşana kadar tekrarlar.
+    GPU encoding performansını test etmek için kullanılır.
+    
+    Örnek:
+    - 3 video URL ver (her biri 10 saniye)
+    - target_duration_seconds: 900 (15 dakika)
+    - 30 sahne = 900 saniye video
+    """
+    from services.video_service import gpu_test_loop_videos
+    
+    if not request.video_urls or len(request.video_urls) == 0:
+        raise HTTPException(status_code=400, detail="video_urls listesi boş olamaz")
+    
+    if request.target_duration_seconds < 10:
+        raise HTTPException(status_code=400, detail="target_duration_seconds en az 10 olmalı")
+    
+    result = gpu_test_loop_videos(
+        video_urls=request.video_urls,
+        target_duration_seconds=request.target_duration_seconds,
+        test_name=request.test_name
+    )
+    
+    return result
+
+
 @router.get("/health")
 async def health_check():
     """API sağlık kontrolü"""

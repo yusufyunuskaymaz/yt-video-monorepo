@@ -229,12 +229,72 @@ async function concatenateVideos({ videoUrls, projectId }) {
   }
 }
 
+/**
+ * GPU Test - Hazır videoları birleştirip GPU performansını test et
+ * @param {object} params - { videoUrls, targetDurationSeconds, testName }
+ * @returns {Promise<object>}
+ */
+async function gpuTest({
+  videoUrls,
+  targetDurationSeconds = 900,
+  testName = "gpu_test",
+}) {
+  console.log(`\n🧪 GPU Test isteği gönderiliyor...`);
+  console.log(`   Video sayısı: ${videoUrls.length}`);
+  console.log(
+    `   Hedef süre: ${targetDurationSeconds}s (${
+      targetDurationSeconds / 60
+    } dk)`
+  );
+  console.log(`   Test adı: ${testName}`);
+
+  try {
+    const response = await axios.post(
+      `${PYTHON_API_URL}/api/video/gpu-test`,
+      {
+        video_urls: videoUrls,
+        target_duration_seconds: targetDurationSeconds,
+        test_name: testName,
+      },
+      { timeout: 3600000 } // 1 saat timeout (uzun videolar için)
+    );
+
+    if (response.data.success) {
+      console.log(`✅ GPU Test tamamlandı: ${response.data.video_url}`);
+      console.log(
+        `   📊 Metrics:`,
+        JSON.stringify(response.data.metrics, null, 2)
+      );
+      return {
+        success: true,
+        video_url: response.data.video_url,
+        test_name: response.data.test_name,
+        metrics: response.data.metrics,
+      };
+    } else {
+      console.error(`❌ GPU Test başarısız:`, response.data.error);
+      return {
+        success: false,
+        error: response.data.error,
+        metrics: response.data.metrics,
+      };
+    }
+  } catch (error) {
+    console.error(`❌ GPU Test hatası:`, error.message);
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
+}
+
 module.exports = {
   requestVideoGeneration,
   generateVideoSync,
   checkPythonApiHealth,
   mergeVideoWithAudio,
   concatenateVideos,
+  gpuTest,
   PYTHON_API_URL,
   NODE_CALLBACK_URL,
 };

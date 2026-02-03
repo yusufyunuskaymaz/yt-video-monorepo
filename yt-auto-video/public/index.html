@@ -429,6 +429,7 @@
       <div class="tabs" id="mainTabs">
         <div class="tab active" data-tab="create">➕ Yeni Proje</div>
         <div class="tab" data-tab="projects">📁 Projeler</div>
+        <div class="tab" data-tab="gputest">🧪 GPU Test</div>
       </div>
 
       <!-- Create Tab -->
@@ -480,29 +481,194 @@
         </div>
       </div>
 
+      <!-- GPU Test Tab -->
+      <div id="tab-gputest" class="tab-content hidden">
+        <div class="card">
+          <h2 style="font-size: 1.2rem; margin-bottom: 20px">
+            🧪 RunPod GPU Test
+          </h2>
+          <p style="color: #a0a0c0; margin-bottom: 20px; font-size: 0.9rem">
+            Hazır video URL'lerini gir, hedef süreyi seç ve GPU performansını
+            test et. Videolar tekrarlanarak hedef süreye ulaşılır.
+          </p>
+
+          <div id="gpuTestMessage" class="message"></div>
+
+          <div class="form-group">
+            <label>📹 Video URL 1</label>
+            <input
+              type="text"
+              id="gpuVideoUrl1"
+              placeholder="https://cdn.example.com/video1.mp4"
+              style="
+                width: 100%;
+                padding: 12px;
+                background: rgba(0, 0, 0, 0.3);
+                border: 2px solid rgba(255, 255, 255, 0.1);
+                border-radius: 10px;
+                color: #fff;
+                font-size: 0.9rem;
+              "
+            />
+          </div>
+
+          <div class="form-group">
+            <label>📹 Video URL 2</label>
+            <input
+              type="text"
+              id="gpuVideoUrl2"
+              placeholder="https://cdn.example.com/video2.mp4"
+              style="
+                width: 100%;
+                padding: 12px;
+                background: rgba(0, 0, 0, 0.3);
+                border: 2px solid rgba(255, 255, 255, 0.1);
+                border-radius: 10px;
+                color: #fff;
+                font-size: 0.9rem;
+              "
+            />
+          </div>
+
+          <div class="form-group">
+            <label>📹 Video URL 3</label>
+            <input
+              type="text"
+              id="gpuVideoUrl3"
+              placeholder="https://cdn.example.com/video3.mp4"
+              style="
+                width: 100%;
+                padding: 12px;
+                background: rgba(0, 0, 0, 0.3);
+                border: 2px solid rgba(255, 255, 255, 0.1);
+                border-radius: 10px;
+                color: #fff;
+                font-size: 0.9rem;
+              "
+            />
+          </div>
+
+          <div class="form-group">
+            <label>⏱️ Hedef Süre</label>
+            <select
+              id="gpuTargetDuration"
+              style="
+                width: 100%;
+                padding: 12px;
+                background: rgba(0, 0, 0, 0.3);
+                border: 2px solid rgba(255, 255, 255, 0.1);
+                border-radius: 10px;
+                color: #fff;
+                font-size: 0.9rem;
+              "
+            >
+              <option value="30">30 saniye (Hızlı Test)</option>
+              <option value="60">1 dakika</option>
+              <option value="180">3 dakika</option>
+              <option value="300">5 dakika</option>
+              <option value="600">10 dakika</option>
+              <option value="900" selected>15 dakika</option>
+              <option value="1800">30 dakika</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>📝 Test Adı (opsiyonel)</label>
+            <input
+              type="text"
+              id="gpuTestName"
+              placeholder="runpod_test_1"
+              value="runpod_test"
+              style="
+                width: 100%;
+                padding: 12px;
+                background: rgba(0, 0, 0, 0.3);
+                border: 2px solid rgba(255, 255, 255, 0.1);
+                border-radius: 10px;
+                color: #fff;
+                font-size: 0.9rem;
+              "
+            />
+          </div>
+
+          <button
+            class="btn"
+            id="gpuTestBtn"
+            onclick="runGpuTest()"
+            style="
+              background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+            "
+          >
+            🚀 GPU Test Başlat
+          </button>
+        </div>
+
+        <!-- GPU Test Sonuçları -->
+        <div id="gpuTestResults" class="card hidden">
+          <h3 style="font-size: 1rem; margin-bottom: 15px">
+            📊 Test Sonuçları
+          </h3>
+          <div class="stats-row" id="gpuTestStats"></div>
+          <div id="gpuTestVideoContainer" style="margin-top: 15px"></div>
+        </div>
+      </div>
+
       <!-- Project Detail Tab -->
       <div id="tab-detail" class="tab-content hidden">
-        <div style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
+        <div
+          style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap"
+        >
           <button class="btn btn-secondary" onclick="goBack()">← Geri</button>
-          <button class="btn btn-pipeline" id="pipelineBtn" onclick="runFullPipeline()">
+          <button
+            class="btn btn-pipeline"
+            id="pipelineBtn"
+            onclick="runFullPipeline()"
+          >
             🚀 Tam Akış Başlat
           </button>
           <button class="btn" id="generateAllBtn" onclick="generateAllImages()">
             🎨 Görseller
           </button>
-          <button class="btn btn-audio" id="generateAudioBtn" onclick="generateAllAudio()">
+          <button
+            class="btn btn-audio"
+            id="generateAudioBtn"
+            onclick="generateAllAudio()"
+          >
             🎙️ Sesler
           </button>
-          <button class="btn" id="generateVideoBtn" onclick="generateAllVideos()">
+          <button
+            class="btn"
+            id="generateVideoBtn"
+            onclick="generateAllVideos()"
+          >
             🎬 Videolar
           </button>
-          <button class="btn btn-merge" id="mergeBtn" onclick="mergeAllVideos()">
+          <button
+            class="btn btn-merge"
+            id="mergeBtn"
+            onclick="mergeAllVideos()"
+          >
             🔗 Birleştir
           </button>
-          <button class="btn" id="concatBtn" onclick="concatenateFinal()" style="background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);">
+          <button
+            class="btn"
+            id="concatBtn"
+            onclick="concatenateFinal()"
+            style="
+              background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
+            "
+          >
             📦 Tümünü Birleştir
           </button>
-          <button class="btn" id="finalVideoBtn" onclick="openFinalVideo()" style="display: none; background: linear-gradient(135deg, #4caf50 0%, #2e7d32 100%);">
+          <button
+            class="btn"
+            id="finalVideoBtn"
+            onclick="openFinalVideo()"
+            style="
+              display: none;
+              background: linear-gradient(135deg, #4caf50 0%, #2e7d32 100%);
+            "
+          >
             🎬 Final Video
           </button>
           <button class="btn btn-secondary" onclick="refreshProject()">
@@ -739,7 +905,7 @@
             `
               )
               .join("");
-            
+
             // Final Video butonu göster/gizle
             const finalVideoBtn = document.getElementById("finalVideoBtn");
             if (p.finalVideoUrl) {
@@ -857,7 +1023,7 @@
         document.getElementById("videoModal").classList.remove("active");
         document.body.style.overflow = "auto";
       }
-      
+
       // Final Video aç
       function openFinalVideo() {
         const btn = document.getElementById("finalVideoBtn");
@@ -891,9 +1057,11 @@
         const progress = document.getElementById("generateProgress");
 
         btn.disabled = true;
-        btn.innerHTML = '<div class="spinner"></div><span>Sesler Oluşturuluyor...</span>';
+        btn.innerHTML =
+          '<div class="spinner"></div><span>Sesler Oluşturuluyor...</span>';
         progress.classList.remove("hidden");
-        document.getElementById("progressText").textContent = "Sesler oluşturuluyor, lütfen bekleyin...";
+        document.getElementById("progressText").textContent =
+          "Sesler oluşturuluyor, lütfen bekleyin...";
 
         try {
           const response = await fetch(
@@ -907,14 +1075,19 @@
           const result = await response.json();
 
           if (result.success) {
-            document.getElementById("progressText").textContent =
-              `✅ Tamamlandı! ${result.processed} ses oluşturuldu.`;
+            document.getElementById(
+              "progressText"
+            ).textContent = `✅ Tamamlandı! ${result.processed} ses oluşturuldu.`;
             setTimeout(() => refreshProject(), 1000);
           } else {
-            document.getElementById("progressText").textContent = `❌ Hata: ${result.error}`;
+            document.getElementById(
+              "progressText"
+            ).textContent = `❌ Hata: ${result.error}`;
           }
         } catch (error) {
-          document.getElementById("progressText").textContent = `❌ Hata: ${error.message}`;
+          document.getElementById(
+            "progressText"
+          ).textContent = `❌ Hata: ${error.message}`;
         } finally {
           btn.disabled = false;
           btn.innerHTML = "🎙️ Tüm Sesleri Oluştur";
@@ -930,9 +1103,11 @@
         const progress = document.getElementById("generateProgress");
 
         btn.disabled = true;
-        btn.innerHTML = '<div class="spinner"></div><span>Videolar Oluşturuluyor...</span>';
+        btn.innerHTML =
+          '<div class="spinner"></div><span>Videolar Oluşturuluyor...</span>';
         progress.classList.remove("hidden");
-        document.getElementById("progressText").textContent = "Videolar oluşturuluyor, lütfen bekleyin...";
+        document.getElementById("progressText").textContent =
+          "Videolar oluşturuluyor, lütfen bekleyin...";
 
         try {
           const response = await fetch(
@@ -942,14 +1117,19 @@
           const result = await response.json();
 
           if (result.success) {
-            document.getElementById("progressText").textContent =
-              `✅ Tamamlandı! ${result.processed} video oluşturuldu.`;
+            document.getElementById(
+              "progressText"
+            ).textContent = `✅ Tamamlandı! ${result.processed} video oluşturuldu.`;
             setTimeout(() => refreshProject(), 1000);
           } else {
-            document.getElementById("progressText").textContent = `❌ Hata: ${result.error}`;
+            document.getElementById(
+              "progressText"
+            ).textContent = `❌ Hata: ${result.error}`;
           }
         } catch (error) {
-          document.getElementById("progressText").textContent = `❌ Hata: ${error.message}`;
+          document.getElementById(
+            "progressText"
+          ).textContent = `❌ Hata: ${error.message}`;
         } finally {
           btn.disabled = false;
           btn.innerHTML = "🎬 Tüm Videoları Oluştur";
@@ -965,9 +1145,11 @@
         const progress = document.getElementById("generateProgress");
 
         btn.disabled = true;
-        btn.innerHTML = '<div class="spinner"></div><span>Birleştiriliyor...</span>';
+        btn.innerHTML =
+          '<div class="spinner"></div><span>Birleştiriliyor...</span>';
         progress.classList.remove("hidden");
-        document.getElementById("progressText").textContent = "Video + Ses birleştiriliyor, lütfen bekleyin...";
+        document.getElementById("progressText").textContent =
+          "Video + Ses birleştiriliyor, lütfen bekleyin...";
 
         try {
           const response = await fetch(
@@ -977,14 +1159,19 @@
           const result = await response.json();
 
           if (result.success) {
-            document.getElementById("progressText").textContent =
-              `✅ Tamamlandı! ${result.processed} video birleştirildi.`;
+            document.getElementById(
+              "progressText"
+            ).textContent = `✅ Tamamlandı! ${result.processed} video birleştirildi.`;
             setTimeout(() => refreshProject(), 1000);
           } else {
-            document.getElementById("progressText").textContent = `❌ Hata: ${result.error}`;
+            document.getElementById(
+              "progressText"
+            ).textContent = `❌ Hata: ${result.error}`;
           }
         } catch (error) {
-          document.getElementById("progressText").textContent = `❌ Hata: ${error.message}`;
+          document.getElementById(
+            "progressText"
+          ).textContent = `❌ Hata: ${error.message}`;
         } finally {
           btn.disabled = false;
           btn.innerHTML = "🔗 Birleştir";
@@ -1000,9 +1187,11 @@
         const progress = document.getElementById("generateProgress");
 
         btn.disabled = true;
-        btn.innerHTML = '<div class="spinner"></div><span>Birleştiriliyor...</span>';
+        btn.innerHTML =
+          '<div class="spinner"></div><span>Birleştiriliyor...</span>';
         progress.classList.remove("hidden");
-        document.getElementById("progressText").textContent = "Final video oluşturuluyor, lütfen bekleyin...";
+        document.getElementById("progressText").textContent =
+          "Final video oluşturuluyor, lütfen bekleyin...";
 
         try {
           const response = await fetch(
@@ -1012,14 +1201,19 @@
           const result = await response.json();
 
           if (result.success) {
-            document.getElementById("progressText").textContent =
-              `✅ Final video oluşturuldu!`;
+            document.getElementById(
+              "progressText"
+            ).textContent = `✅ Final video oluşturuldu!`;
             setTimeout(() => refreshProject(), 1000);
           } else {
-            document.getElementById("progressText").textContent = `❌ Hata: ${result.error}`;
+            document.getElementById(
+              "progressText"
+            ).textContent = `❌ Hata: ${result.error}`;
           }
         } catch (error) {
-          document.getElementById("progressText").textContent = `❌ Hata: ${error.message}`;
+          document.getElementById(
+            "progressText"
+          ).textContent = `❌ Hata: ${error.message}`;
         } finally {
           btn.disabled = false;
           btn.innerHTML = "📦 Tümünü Birleştir";
@@ -1037,7 +1231,8 @@
         btn.disabled = true;
         btn.innerHTML = '<div class="spinner"></div><span>Çalışıyor...</span>';
         progress.classList.remove("hidden");
-        document.getElementById("progressText").textContent = "🚀 Tam akış başlatıldı... Resim → Ses → Video → Birleştirme";
+        document.getElementById("progressText").textContent =
+          "🚀 Tam akış başlatıldı... Resim → Ses → Video → Birleştirme";
 
         try {
           const response = await fetch(
@@ -1052,18 +1247,100 @@
 
           if (result.success) {
             const r = result.results;
-            document.getElementById("progressText").textContent =
-              `✅ Tamamlandı! Görseller: ${r.images.processed}, Sesler: ${r.audio.processed}, Videolar: ${r.videos.processed}, Birleştirme: ${r.merge.processed}`;
+            document.getElementById(
+              "progressText"
+            ).textContent = `✅ Tamamlandı! Görseller: ${r.images.processed}, Sesler: ${r.audio.processed}, Videolar: ${r.videos.processed}, Birleştirme: ${r.merge.processed}`;
             setTimeout(() => refreshProject(), 1000);
           } else {
-            document.getElementById("progressText").textContent = `❌ Hata: ${result.error}`;
+            document.getElementById(
+              "progressText"
+            ).textContent = `❌ Hata: ${result.error}`;
           }
         } catch (error) {
-          document.getElementById("progressText").textContent = `❌ Hata: ${error.message}`;
+          document.getElementById(
+            "progressText"
+          ).textContent = `❌ Hata: ${error.message}`;
         } finally {
           btn.disabled = false;
           btn.innerHTML = "🚀 Tam Akış Başlat";
           setTimeout(() => progress.classList.add("hidden"), 5000);
+        }
+      }
+
+      // GPU Test
+      async function runGpuTest() {
+        const url1 = document.getElementById('gpuVideoUrl1').value.trim();
+        const url2 = document.getElementById('gpuVideoUrl2').value.trim();
+        const url3 = document.getElementById('gpuVideoUrl3').value.trim();
+        const targetDuration = parseInt(document.getElementById('gpuTargetDuration').value);
+        const testName = document.getElementById('gpuTestName').value.trim() || 'gpu_test';
+        
+        const msgEl = document.getElementById('gpuTestMessage');
+        const btn = document.getElementById('gpuTestBtn');
+        const resultsEl = document.getElementById('gpuTestResults');
+        
+        // En az 1 URL gerekli
+        const videoUrls = [url1, url2, url3].filter(u => u.length > 0);
+        if (videoUrls.length === 0) {
+          showMessage(msgEl, 'error', 'En az 1 video URL gerekli!');
+          return;
+        }
+        
+        btn.disabled = true;
+        btn.innerHTML = '<div class="spinner"></div><span>GPU Test Çalışıyor...</span>';
+        msgEl.className = 'message';
+        resultsEl.classList.add('hidden');
+        
+        try {
+          // Python API'ye istek at (Node.js proxy üzerinden)
+          const response = await fetch('/api/gpu-test', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              video_urls: videoUrls,
+              target_duration_seconds: targetDuration,
+              test_name: testName
+            })
+          });
+          
+          const result = await response.json();
+          
+          if (result.success) {
+            showMessage(msgEl, 'success', '✅ GPU Test başarıyla tamamlandı!');
+            
+            // Sonuçları göster
+            const m = result.metrics;
+            const totalTimeMs = m.download_time_ms + m.encode_time_ms + m.upload_time_ms;
+            const encodingSpeed = (m.total_duration / (m.encode_time_ms / 1000)).toFixed(2);
+            
+            document.getElementById('gpuTestStats').innerHTML = `
+              <div class="stat-box"><div class="stat-value">${(m.download_time_ms/1000).toFixed(1)}s</div><div class="stat-label">İndirme</div></div>
+              <div class="stat-box"><div class="stat-value" style="color: #ff6b6b;">${(m.encode_time_ms/1000).toFixed(1)}s</div><div class="stat-label">Encoding</div></div>
+              <div class="stat-box"><div class="stat-value">${(m.upload_time_ms/1000).toFixed(1)}s</div><div class="stat-label">Yükleme</div></div>
+              <div class="stat-box"><div class="stat-value" style="color: #4caf50;">${(totalTimeMs/1000).toFixed(1)}s</div><div class="stat-label">Toplam</div></div>
+              <div class="stat-box"><div class="stat-value">${m.video_count}</div><div class="stat-label">Klip Sayısı</div></div>
+              <div class="stat-box"><div class="stat-value">${(m.total_duration/60).toFixed(1)} dk</div><div class="stat-label">Video Süresi</div></div>
+              <div class="stat-box"><div class="stat-value" style="color: #667eea;">${encodingSpeed}x</div><div class="stat-label">Encoding Hızı</div></div>
+            `;
+            
+            document.getElementById('gpuTestVideoContainer').innerHTML = `
+              <button class="video-play-btn" onclick="openVideoModal('${result.video_url}')" style="background: linear-gradient(135deg, #4caf50 0%, #2e7d32 100%);">
+                ▶️ Test Videosunu İzle
+              </button>
+              <a href="${result.video_url}" target="_blank" style="margin-left: 10px; color: #667eea; text-decoration: underline; font-size: 0.85rem;">
+                🔗 CDN Link
+              </a>
+            `;
+            
+            resultsEl.classList.remove('hidden');
+          } else {
+            showMessage(msgEl, 'error', `❌ Hata: ${result.error}`);
+          }
+        } catch (error) {
+          showMessage(msgEl, 'error', `❌ Sunucu hatası: ${error.message}`);
+        } finally {
+          btn.disabled = false;
+          btn.innerHTML = '🚀 GPU Test Başlat';
         }
       }
 
@@ -1077,5 +1354,3 @@
     </script>
   </body>
 </html>
-
-
