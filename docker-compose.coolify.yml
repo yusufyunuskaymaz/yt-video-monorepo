@@ -26,7 +26,7 @@ services:
 
   # Node.js Backend (Ana API)
   backend:
-    image: kaymazyusuf/backend_nodejs:latest
+    image: kaymazyusuf/backend_nodejs:v2
     ports:
       - "3000:3000"
     environment:
