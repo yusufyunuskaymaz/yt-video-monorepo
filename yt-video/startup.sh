@@ -31,9 +31,12 @@ if [ -f "/workspace/.env" ]; then
   export $(cat /workspace/.env | xargs)
 fi
 
-# FFmpeg binary'yi ayarla
+# FFmpeg ve ImageMagick binary paths (MoviePy için)
 export FFMPEG_BINARY=/usr/bin/ffmpeg
 export IMAGEMAGICK_BINARY=/usr/bin/convert
+
+echo "🔧 FFmpeg: $(ffmpeg -version | head -n1)"
+echo "🔧 NVENC: $(ffmpeg -encoders 2>/dev/null | grep nvenc | wc -l) encoders available"
 
 echo "✅ Kod hazır: $CODE_DIR"
 echo "🚀 API başlatılıyor..."
