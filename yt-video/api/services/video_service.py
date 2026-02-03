@@ -530,8 +530,7 @@ def gpu_test_loop_videos(
             preset='fast',
             threads=4,
             fps=30,
-            logger='bar',
-            ffmpeg_params=['-hwaccel', 'cuda']  # GPU acceleration
+            logger='bar'
         )
         
         encode_end = time.time()
