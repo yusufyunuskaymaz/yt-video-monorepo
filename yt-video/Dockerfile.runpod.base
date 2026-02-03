@@ -1,0 +1,38 @@
+# ========================================
+# RunPod Base Image - Sadece Dependencies
+# ========================================
+# Kod GİTHUB'dan gelecek, bu sadece ortam hazırlığı
+
+FROM nvidia/cuda:12.2.0-runtime-ubuntu22.04
+
+# Sistem bağımlılıkları
+RUN apt-get update && apt-get install -y \
+    python3.11 \
+    python3-pip \
+    ffmpeg \
+    nvidia-cuda-toolkit \
+    imagemagick \
+    git \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# ImageMagick policy düzeltmesi
+RUN sed -i 's/rights="none" pattern="PDF"/rights="read|write" pattern="PDF"/' /etc/ImageMagick-6/policy.xml || true
+
+WORKDIR /app
+
+# Python bağımlılıklarını kopyala ve kur (kod DEĞİL!)
+COPY requirements.txt .
+RUN pip3 install --no-cache-dir -r requirements.txt
+
+# Workspace directory oluştur
+RUN mkdir -p /workspace
+
+# Startup script
+COPY startup.sh /startup.sh
+RUN chmod +x /startup.sh
+
+EXPOSE 8000
+
+# Startup script çalıştır
+CMD ["/startup.sh"]
