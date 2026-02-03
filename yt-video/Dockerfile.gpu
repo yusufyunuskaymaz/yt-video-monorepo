@@ -1,0 +1,36 @@
+# ========================================
+# GPU Destekli Python Video API Dockerfile
+# ========================================
+# NVIDIA CUDA + FFmpeg NVENC desteği
+
+FROM nvidia/cuda:12.2.0-runtime-ubuntu22.04
+
+# Sistem bağımlılıkları
+RUN apt-get update && apt-get install -y \
+    python3.10 \
+    python3-pip \
+    ffmpeg \
+    imagemagick \
+    git \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# ImageMagick policy düzeltmesi (PDF/video işleme için)
+RUN sed -i 's/rights="none" pattern="PDF"/rights="read|write" pattern="PDF"/' /etc/ImageMagick-6/policy.xml || true
+
+WORKDIR /app
+
+# Python bağımlılıkları
+COPY requirements.txt .
+RUN pip3 install --no-cache-dir -r requirements.txt
+
+# Uygulama kodu (volume mount ile override edilecek)
+COPY . .
+
+# API klasörüne geç
+WORKDIR /app/api
+
+EXPOSE 8000
+
+# Uvicorn ile başlat (hot-reload aktif)
+CMD ["python3", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

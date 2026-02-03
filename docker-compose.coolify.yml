@@ -1,8 +1,8 @@
 # ========================================
 # Coolify Deployment: Node.js Backend + PostgreSQL
 # ========================================
-# Python Video API bu dosyada YOK - RunPod'da ayrı çalışacak
-# Coolify bu dosyayı otomatik olarak deploy edecek
+# Docker Hub YOK - Local build + Volume mount
+# Coolify bu dosyayı Git repo'dan çeker ve local build yapar
 
 services:
   # PostgreSQL Veritabanı
@@ -24,13 +24,19 @@ services:
       timeout: 5s
       retries: 5
 
-  # Node.js Backend (Ana API)
+  # Node.js Backend (Local Build)
   backend:
-    image: kaymazyusuf/backend_nodejs:latest
+    build:
+      context: ./yt-auto-video
+      dockerfile: Dockerfile
     ports:
       - "3000:3000"
+    volumes:
+      # Kod değişiklikleri için - rebuild gerekmez
+      - ./yt-auto-video/src:/app/src
+      - ./yt-auto-video/public:/app/public
     environment:
-      # Database - Coolify internal network
+      # Database
       - DATABASE_URL=postgresql://${POSTGRES_USER:-ai_voice_user}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ai_video_generator}?schema=public
 
       # Fal.ai
@@ -48,10 +54,10 @@ services:
       # Server Config
       - PORT=3000
 
-      # RunPod Python API (pod başlatınca URL'i al)
+      # RunPod Python API URL
       - PYTHON_API_URL=${RUNPOD_PYTHON_API_URL:-http://localhost:8000}
 
-      # Callback URL - Coolify'ın atadığı domain veya IP
+      # Callback URL
       - NODE_CALLBACK_URL=${NODE_CALLBACK_URL:-http://localhost:3000/webhook}
 
     depends_on:
