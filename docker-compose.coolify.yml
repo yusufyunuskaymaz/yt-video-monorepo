@@ -31,10 +31,6 @@ services:
       dockerfile: Dockerfile
     ports:
       - "3000:3000"
-    volumes:
-      # Kod değişiklikleri için - rebuild gerekmez
-      - ./yt-auto-video/src:/app/src
-      - ./yt-auto-video/public:/app/public
     environment:
       # Database
       - DATABASE_URL=postgresql://${POSTGRES_USER:-ai_voice_user}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ai_video_generator}?schema=public
