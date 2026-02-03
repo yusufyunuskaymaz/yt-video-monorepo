@@ -525,12 +525,13 @@ def gpu_test_loop_videos(
         
         final_clip.write_videofile(
             output_path,
-            codec='libx264',
+            codec='h264_nvenc',  # NVIDIA GPU encoding
             audio_codec='aac',
-            preset='fast',  # GPU testi için fast preset
+            preset='fast',
             threads=4,
             fps=30,
-            logger='bar'
+            logger='bar',
+            ffmpeg_params=['-hwaccel', 'cuda']  # GPU acceleration
         )
         
         encode_end = time.time()
