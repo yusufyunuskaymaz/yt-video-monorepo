@@ -51,7 +51,7 @@ services:
       - PORT=3000
 
       # RunPod Python API URL
-      - PYTHON_API_URL=${RUNPOD_PYTHON_API_URL:-http://localhost:8000}
+      - PYTHON_API_URL=${PYTHON_API_URL:-http://localhost:8000}
 
       # Callback URL
       - NODE_CALLBACK_URL=${NODE_CALLBACK_URL:-http://localhost:3000/webhook}
