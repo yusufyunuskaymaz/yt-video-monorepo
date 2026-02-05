@@ -34,9 +34,7 @@ jobs:
           context: ./yt-video
           file: ./yt-video/Dockerfile.runpod.base
           push: true
-          tags: |
-            kaymazyusuf/runpod-video-api:base
-            kaymazyusuf/runpod-video-api:base-${{ github.sha }}
+          tags: kaymazyusuf/runpod-video-api:base
           platforms: linux/amd64
           cache-from: |
             type=gha
