@@ -408,7 +408,7 @@ def gpu_test_loop_videos(
     """
     🧪 GPU Test: Hazır videoları hedef süreye kadar döngüsel birleştir
     """
-    from moviepy.editor import VideoFileClip, concatenate_videoclips
+    from moviepy import VideoFileClip, concatenate_videoclips
     import shutil
     import time
     
