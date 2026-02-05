@@ -163,18 +163,20 @@ def merge_video_with_audio(
 ) -> dict:
     """
     Sessiz video ile sesi birleştir, altyazı ekle ve CDN'e yükle
+    FFmpeg direct kullanarak GPU NVENC encoding
     """
-    from moviepy import VideoFileClip, AudioFileClip
+    import subprocess
+    import json
     from services.subtitle_service import add_karaoke_subtitles
     
-    print(f"\n🔗 ========== VIDEO + SES BİRLEŞTİRME ==========")
+    print(f"\n🔗 ========== VIDEO + SES BİRLEŞTİRME (FFmpeg) ==========")
     print(f"🎬 Video URL: {video_url}")
     print(f"🔊 Audio URL: {audio_url}")
     print(f"🎯 Scene ID: {scene_id}")
     print(f"📝 Altyazı: {'Var' if narration else 'Yok'}")
     if project_id: print(f"📁 Proje ID: {project_id}")
     if scene_number: print(f"🎬 Sahne No: {scene_number}")
-    print(f"=================================================\n")
+    print(f"=========================================================\n")
     
     temp_dir = tempfile.mkdtemp(prefix="merge_")
     
@@ -192,39 +194,45 @@ def merge_video_with_audio(
         with Timer("PY_MERGE_AUDIO_DOWNLOAD", meta):
             download_file(audio_url, audio_path)
         
-        # 3. Video ve sesi yükle
-        print(f"🎬 Video yükleniyor...")
-        video = VideoFileClip(video_path)
+        # 3. FFprobe ile süreleri al
+        probe_cmd = ['ffprobe', '-v', 'quiet', '-print_format', 'json', '-show_format', audio_path]
+        probe_result = subprocess.run(probe_cmd, capture_output=True, text=True)
+        probe_data = json.loads(probe_result.stdout)
+        audio_duration = float(probe_data['format']['duration'])
         
-        print(f"🔊 Ses yükleniyor...")
-        audio = AudioFileClip(audio_path)
+        probe_cmd_video = ['ffprobe', '-v', 'quiet', '-print_format', 'json', '-show_format', video_path]
+        probe_result_video = subprocess.run(probe_cmd_video, capture_output=True, text=True)
+        probe_data_video = json.loads(probe_result_video.stdout)
+        video_duration = float(probe_data_video['format']['duration'])
         
-        audio_duration = audio.duration
-        print(f"   Video süresi: {video.duration:.2f}s")
+        print(f"   Video süresi: {video_duration:.2f}s")
         print(f"   Ses süresi: {audio_duration:.2f}s")
         
-        # 4. Sesi videoya ekle
-        print(f"🔗 Birleştiriliyor...")
-        
-        final_video = video.with_audio(audio)
-        
-        # 5. Kaydet (altyazısız versiyon)
+        # 4. FFmpeg ile birleştir (GPU NVENC)
         merged_path = os.path.join(temp_dir, "merged.mp4")
-        print(f"💾 Kaydediliyor: {merged_path}")
+        print(f"🔗 FFmpeg ile birleştiriliyor (GPU NVENC)...")
         
-        with Timer("PY_MOVIEPY_WRITE_VIDEO", meta):
-            final_video.write_videofile(
-                merged_path,
-                codec='libx264',
-                audio_codec='aac',
-                fps=video.fps,
-                logger='bar'
-            )
-        
-        # Kaynakları kapat
-        video.close()
-        audio.close()
-        final_video.close()
+        with Timer("PY_FFMPEG_MERGE", meta):
+            ffmpeg_cmd = [
+                'ffmpeg', '-y',
+                '-i', video_path,
+                '-i', audio_path,
+                '-c:v', 'h264_nvenc',  # GPU encoding
+                '-preset', 'fast',
+                '-b:v', '5M',
+                '-c:a', 'aac',
+                '-b:a', '128k',
+                '-map', '0:v:0',
+                '-map', '1:a:0',
+                '-shortest',
+                merged_path
+            ]
+            
+            result = subprocess.run(ffmpeg_cmd, capture_output=True, text=True)
+            
+            if result.returncode != 0:
+                print(f"⚠️ FFmpeg stderr: {result.stderr[-500:]}")
+                raise Exception(f"FFmpeg hatası: {result.stderr[-200:]}")
         
         # 6. Altyazı ekle (narration varsa)
         output_path = merged_path
@@ -279,7 +287,7 @@ def merge_video_with_audio(
 def concatenate_videos(video_urls: list, project_id: str) -> dict:
     """
     Birden fazla video URL'sini sırayla birleştirip tek video yapar.
-    FFmpeg concat demuxer kullanır.
+    FFmpeg concat demuxer + GPU NVENC encoding kullanır.
     
     Args:
         video_urls: Sıralı video URL listesi
@@ -293,18 +301,12 @@ def concatenate_videos(video_urls: list, project_id: str) -> dict:
         }
     """
     import shutil
+    import subprocess
     
-    # imageio-ffmpeg kullanarak FFmpeg yolunu bul
-    try:
-        import imageio_ffmpeg
-        ffmpeg_binary = imageio_ffmpeg.get_ffmpeg_exe()
-    except ImportError:
-        ffmpeg_binary = 'ffmpeg'
-    
-    print(f"\n🎬 ========== VİDEO BİRLEŞTİRME (CONCAT) ==========")
+    print(f"\n🎬 ========== VİDEO BİRLEŞTİRME (FFmpeg NVENC) ==========")
     print(f"📦 Video Sayısı: {len(video_urls)}")
     print(f"🎯 Proje ID: {project_id}")
-    print(f"===================================================\n")
+    print(f"========================================================\n")
     
     if not video_urls or len(video_urls) == 0:
         return {
@@ -336,35 +338,39 @@ def concatenate_videos(video_urls: list, project_id: str) -> dict:
                 downloaded_files.append(local_path)
                 print(f"✅ İndirildi: {local_path}")
         
-        # 2. MoviePy ile birleştir (FFmpeg concat demuxer ses kayması yapıyordu)
-        from moviepy import VideoFileClip, concatenate_videoclips
+        # 2. FFmpeg concat listesi oluştur
+        concat_list_path = os.path.join(temp_dir, "concat_list.txt")
+        with open(concat_list_path, 'w') as f:
+            for video_path in downloaded_files:
+                f.write(f"file '{video_path}'\n")
         
-        print("🎬 MoviePy ile videolar yükleniyor...")
-        clips = []
-        for video_path in downloaded_files:
-            clip = VideoFileClip(video_path)
-            clips.append(clip)
-            print(f"   ✅ Yüklendi: {os.path.basename(video_path)} ({clip.duration:.2f}s)")
+        print(f"📝 Concat listesi oluşturuldu: {len(downloaded_files)} video")
         
-        print("🔗 Videolar birleştiriliyor...")
-        final_clip = concatenate_videoclips(clips, method="compose")
-        
+        # 3. FFmpeg ile birleştir (GPU NVENC)
         output_path = os.path.join(temp_dir, "final_video.mp4")
-        print(f"💾 Kaydediliyor: {output_path}")
-        with Timer("PY_MOVIEPY_CONCAT_WRITE", {"project_id": project_id, "count": len(video_urls)}):
-            final_clip.write_videofile(
-                output_path,
-                codec='libx264',
-                audio_codec='aac',
-                preset='fast',
-                threads=4,
-                logger='bar'
-            )
+        print(f"� FFmpeg ile birleştiriliyor (GPU NVENC)...")
         
-        # Clipleri kapat
-        for clip in clips:
-            clip.close()
-        final_clip.close()
+        with Timer("PY_FFMPEG_CONCAT", {"project_id": project_id, "count": len(video_urls)}):
+            ffmpeg_cmd = [
+                'ffmpeg', '-y',
+                '-f', 'concat',
+                '-safe', '0',
+                '-i', concat_list_path,
+                '-c:v', 'h264_nvenc',  # GPU encoding
+                '-preset', 'fast',
+                '-b:v', '5M',
+                '-maxrate', '8M',
+                '-bufsize', '10M',
+                '-c:a', 'aac',
+                '-b:a', '128k',
+                output_path
+            ]
+            
+            result = subprocess.run(ffmpeg_cmd, capture_output=True, text=True)
+            
+            if result.returncode != 0:
+                print(f"⚠️ FFmpeg stderr: {result.stderr[-500:]}")
+                raise Exception(f"FFmpeg hatası: {result.stderr[-200:]}")
         
         print(f"✅ Birleştirme tamamlandı: {output_path}")
         
