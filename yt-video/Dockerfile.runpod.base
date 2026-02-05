@@ -1,33 +1,35 @@
 # ========================================
-# RunPod Base Image - Sadece Dependencies
+# RunPod Base Image - Optimized
 # ========================================
 # Kod GİTHUB'dan gelecek, bu sadece ortam hazırlığı
 
 FROM nvidia/cuda:12.2.0-runtime-ubuntu22.04
 
-# Sistem bağımlılıkları
-RUN apt-get update && apt-get install -y \
+# Tüm apt paketlerini TEK RUN'da kur (layer cache için)
+RUN apt-get update && apt-get install -y --no-install-recommends \
     python3.11 \
     python3-pip \
     git \
     curl \
-    && rm -rf /var/lib/apt/lists/*
-
-# FFmpeg ve NVIDIA araçları (GPU encoding için)
-RUN apt-get update && apt-get install -y \
     ffmpeg \
-    nvidia-cuda-toolkit \
     imagemagick \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# nvidia-cuda-toolkit çok büyük - gereksizse kaldır
+# Sadece nvcc gerekiyorsa: nvidia-cuda-toolkit yerine cuda-minimal
 
 # ImageMagick policy düzeltmesi
-RUN sed -i 's/rights="none" pattern="PDF"/rights="read|write" pattern="PDF"/' /etc/ImageMagick-6/policy.xml || true
+RUN sed -i 's/rights="none" pattern="PDF"/rights="read|write" pattern="PDF"/' /etc/ImageMagick-6/policy.xml 2>/dev/null || true
 
 WORKDIR /app
 
-# Python bağımlılıklarını kopyala ve kur (kod DEĞİL!)
+# Python bağımlılıklarını kopyala (ayrı layer - cache için)
 COPY requirements.txt .
-RUN pip3 install --no-cache-dir -r requirements.txt
+
+# Pip cache'i kullan ve gereksiz dosyaları temizle
+RUN pip3 install --no-cache-dir --compile -r requirements.txt \
+    && rm -rf ~/.cache/pip
 
 # Workspace directory oluştur
 RUN mkdir -p /workspace
@@ -38,5 +40,4 @@ RUN chmod +x /startup.sh
 
 EXPOSE 8000
 
-# Startup script çalıştır
 CMD ["/startup.sh"]

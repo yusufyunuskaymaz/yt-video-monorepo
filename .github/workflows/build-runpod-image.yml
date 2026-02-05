@@ -38,8 +38,12 @@ jobs:
             kaymazyusuf/runpod-video-api:base
             kaymazyusuf/runpod-video-api:base-${{ github.sha }}
           platforms: linux/amd64
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: |
+            type=gha
+            type=registry,ref=kaymazyusuf/runpod-video-api:buildcache
+          cache-to: |
+            type=gha,mode=max
+            type=registry,ref=kaymazyusuf/runpod-video-api:buildcache,mode=max
 
       - name: Image digest
         run: echo "Image pushed successfully!"

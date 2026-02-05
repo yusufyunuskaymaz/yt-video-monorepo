@@ -21,14 +21,12 @@ else
   git clone $REPO_URL $CODE_DIR
 fi
 
-# .env dosyasını kontrol et
-if [ ! -f "/workspace/.env" ]; then
-  echo "⚠️ /workspace/.env bulunamadı - lütfen RunPod environment variables ayarlayın"
-fi
-
-# Environment variables yükle
-if [ -f "/workspace/.env" ]; then
-  export $(cat /workspace/.env | xargs)
+# Environment variables kontrolü
+# RunPod env variables container'a otomatik aktarılır - .env dosyasına gerek yok
+if [ -z "$R2_BUCKET_NAME" ]; then
+  echo "⚠️ R2_BUCKET_NAME ayarlanmamış - RunPod Environment Variables kontrol et!"
+else
+  echo "✅ Environment variables yüklendi (R2_BUCKET: $R2_BUCKET_NAME)"
 fi
 
 # FFmpeg ve ImageMagick binary paths (MoviePy için)
