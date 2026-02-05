@@ -473,7 +473,7 @@ def gpu_test_loop_videos(
             
             remaining = target_duration_seconds - current_duration
             if clip_info["duration"] > remaining:
-                trimmed_clip = clip_info["clip"].subclip(0, remaining)
+                trimmed_clip = clip_info["clip"].subclipped(0, remaining)
                 all_clips.append(trimmed_clip)
                 current_duration += remaining
                 print(f"   ✂️ Klip {len(all_clips)}: {remaining:.2f}s (kesildi)")
