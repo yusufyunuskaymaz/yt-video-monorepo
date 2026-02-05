@@ -406,17 +406,19 @@ def gpu_test_loop_videos(
     test_name: str = "gpu_test"
 ) -> dict:
     """
-    🧪 GPU Test: Hazır videoları hedef süreye kadar döngüsel birleştir
+    🧪 GPU Test: FFmpeg ile direkt video birleştirme (NVENC GPU encoding)
+    MoviePy yerine FFmpeg kullanarak çok daha hızlı!
     """
-    from moviepy import VideoFileClip, concatenate_videoclips
+    import subprocess
     import shutil
     import time
+    import json
     
-    print(f"\n🧪 ========== GPU TEST BAŞLADI ==========")
+    print(f"\n🧪 ========== GPU TEST BAŞLADI (FFmpeg Direct) ==========")
     print(f"📦 Video URL Sayısı: {len(video_urls)}")
     print(f"⏱️ Hedef Süre: {target_duration_seconds} saniye ({target_duration_seconds/60:.1f} dakika)")
     print(f"📝 Test Adı: {test_name}")
-    print(f"=============================================\n")
+    print(f"=========================================================\n")
     
     if not video_urls or len(video_urls) == 0:
         return {
@@ -436,101 +438,115 @@ def gpu_test_loop_videos(
     }
     
     try:
-        # 1. Videoları indir ve süreleri hesapla
+        # 1. Videoları indir
         print("📥 Videolar indiriliyor...")
         download_start = time.time()
         
-        downloaded_clips = []
-        total_source_duration = 0
+        downloaded_files = []
+        video_durations = []
         
         for i, url in enumerate(video_urls):
             local_path = os.path.join(temp_dir, f"source_{i:03d}.mp4")
             print(f"   ⬇️ ({i+1}/{len(video_urls)}) {url[:60]}...")
             download_file(url, local_path)
+            downloaded_files.append(local_path)
             
-            clip = VideoFileClip(local_path)
-            total_source_duration += clip.duration
-            downloaded_clips.append({"path": local_path, "clip": clip, "duration": clip.duration})
-            print(f"      ✅ Süre: {clip.duration:.2f}s")
+            # FFprobe ile süre al
+            probe_cmd = [
+                'ffprobe', '-v', 'quiet', '-print_format', 'json',
+                '-show_format', local_path
+            ]
+            probe_result = subprocess.run(probe_cmd, capture_output=True, text=True)
+            probe_data = json.loads(probe_result.stdout)
+            duration = float(probe_data['format']['duration'])
+            video_durations.append(duration)
+            print(f"      ✅ Süre: {duration:.2f}s")
         
         download_end = time.time()
         metrics["download_time_ms"] = int((download_end - download_start) * 1000)
         
+        total_source_duration = sum(video_durations)
         print(f"\n📊 Kaynak videoların toplam süresi: {total_source_duration:.2f}s")
         
-        # 2. Hedef süreye ulaşmak için kaç tekrar gerekli hesapla
-        repeat_count = int(target_duration_seconds / total_source_duration) + 1
-        print(f"🔄 Tekrar sayısı: {repeat_count} (hedef: {target_duration_seconds}s)")
+        # 2. Concat listesi oluştur (hedef süreye kadar döngüsel)
+        print("\n🎬 FFmpeg concat listesi hazırlanıyor...")
+        concat_list_path = os.path.join(temp_dir, "concat_list.txt")
         
-        # 3. Döngüsel clip listesi oluştur
-        print("\n🎬 Video klipleri hazırlanıyor...")
-        all_clips = []
         current_duration = 0
-        video_index = 0
+        video_count = 0
         
-        while current_duration < target_duration_seconds:
-            clip_info = downloaded_clips[video_index % len(downloaded_clips)]
-            
-            remaining = target_duration_seconds - current_duration
-            if clip_info["duration"] > remaining:
-                trimmed_clip = clip_info["clip"].subclipped(0, remaining)
-                all_clips.append(trimmed_clip)
-                current_duration += remaining
-                print(f"   ✂️ Klip {len(all_clips)}: {remaining:.2f}s (kesildi)")
-            else:
-                all_clips.append(clip_info["clip"])
-                current_duration += clip_info["duration"]
-                print(f"   ➕ Klip {len(all_clips)}: {clip_info['duration']:.2f}s (toplam: {current_duration:.2f}s)")
-            
-            video_index += 1
+        with open(concat_list_path, 'w') as f:
+            while current_duration < target_duration_seconds:
+                for i, (path, duration) in enumerate(zip(downloaded_files, video_durations)):
+                    if current_duration >= target_duration_seconds:
+                        break
+                    
+                    remaining = target_duration_seconds - current_duration
+                    
+                    if duration <= remaining:
+                        # Tam video ekle
+                        f.write(f"file '{path}'\n")
+                        current_duration += duration
+                        video_count += 1
+                        print(f"   ➕ Video {video_count}: {duration:.2f}s (toplam: {current_duration:.2f}s)")
+                    else:
+                        # Son video - kırpılacak (FFmpeg ile)
+                        trimmed_path = os.path.join(temp_dir, f"trimmed_{video_count}.mp4")
+                        trim_cmd = [
+                            'ffmpeg', '-y', '-i', path,
+                            '-t', str(remaining),
+                            '-c', 'copy',  # Stream copy - çok hızlı!
+                            trimmed_path
+                        ]
+                        subprocess.run(trim_cmd, capture_output=True)
+                        f.write(f"file '{trimmed_path}'\n")
+                        current_duration += remaining
+                        video_count += 1
+                        print(f"   ✂️ Video {video_count}: {remaining:.2f}s (kesildi, toplam: {current_duration:.2f}s)")
+                        break
         
-        metrics["video_count"] = len(all_clips)
+        metrics["video_count"] = video_count
         metrics["total_duration"] = current_duration
         
-        print(f"\n📦 Toplam klip sayısı: {len(all_clips)}")
+        print(f"\n📦 Toplam video sayısı: {video_count}")
         print(f"⏱️ Toplam süre: {current_duration:.2f}s ({current_duration/60:.1f} dakika)")
         
-        # 4. Birleştir ve encode et (GPU!)
-        print("\n🔗 Videolar birleştiriliyor (GPU ENCODING)...")
+        # 3. FFmpeg ile birleştir + NVENC encode
+        print("\n🔗 FFmpeg ile birleştiriliyor (GPU NVENC)...")
+        output_path = os.path.join(temp_dir, f"{test_name}_output.mp4")
+        
         encode_start = time.time()
         
-        final_clip = concatenate_videoclips(all_clips, method="compose")
+        ffmpeg_cmd = [
+            'ffmpeg', '-y',
+            '-f', 'concat',
+            '-safe', '0',
+            '-i', concat_list_path,
+            '-c:v', 'h264_nvenc',      # GPU encoding
+            '-preset', 'fast',
+            '-b:v', '5M',
+            '-maxrate', '8M',
+            '-bufsize', '10M',
+            '-c:a', 'aac',
+            '-b:a', '128k',
+            output_path
+        ]
         
-        output_path = os.path.join(temp_dir, f"{test_name}_output.mp4")
-        print(f"💾 Encode ediliyor: {output_path}")
+        print(f"💾 Encode komutu: {' '.join(ffmpeg_cmd[:10])}...")
         
-        # ✅ DÜZELTİLMİŞ GPU ENCODING AYARLARI
-        final_clip.write_videofile(
-            output_path,
-            codec='h264_nvenc',       # NVIDIA GPU codec
-            audio_codec='aac',
-            preset='fast',            # 'fast', 'medium', 'slow' (p4 değil!)
-            ffmpeg_params=[
-                '-b:v', '5M',         # Bitrate
-                '-maxrate', '8M',     # Max bitrate
-                '-bufsize', '10M',    # Buffer size
-                '-gpu', '0',          # GPU index
-                '-rc', 'vbr',         # Rate control: variable bitrate
-                '-cq', '23',          # Quality: 0-51 (23 = good quality)
-                '-profile:v', 'high'  # H.264 profile
-            ],
-            fps=30,
-            threads=4,                # Thread sayısı
-            logger='bar'
-        )
+        result = subprocess.run(ffmpeg_cmd, capture_output=True, text=True)
+        
+        if result.returncode != 0:
+            print(f"⚠️ FFmpeg stderr: {result.stderr[-500:]}")
+            raise Exception(f"FFmpeg hatası: {result.stderr[-200:]}")
         
         encode_end = time.time()
         metrics["encode_time_ms"] = int((encode_end - encode_start) * 1000)
         
-        # Kaynak klipleri kapat
-        for clip_info in downloaded_clips:
-            clip_info["clip"].close()
-        final_clip.close()
-        
         print(f"\n✅ Encoding tamamlandı!")
         print(f"   ⏱️ Encoding süresi: {metrics['encode_time_ms']/1000:.2f}s")
         
-        # 5. CDN'e yükle
+        # 4. CDN'e yükle
         print("\n☁️ CDN'e yükleniyor...")
         upload_start = time.time()
         
@@ -541,6 +557,7 @@ def gpu_test_loop_videos(
         
         # Performans özeti
         total_time_ms = metrics["download_time_ms"] + metrics["encode_time_ms"] + metrics["upload_time_ms"]
+        encoding_speed = metrics["total_duration"] / (metrics["encode_time_ms"] / 1000) if metrics["encode_time_ms"] > 0 else 0
         
         print(f"\n🎉 ========== GPU TEST TAMAMLANDI ==========")
         print(f"🔗 CDN URL: {cdn_url}")
@@ -551,7 +568,7 @@ def gpu_test_loop_videos(
         print(f"   ⏱️ TOPLAM: {total_time_ms/1000:.2f}s")
         print(f"\n   📦 Video sayısı: {metrics['video_count']}")
         print(f"   ⏱️ Video süresi: {metrics['total_duration']:.2f}s")
-        print(f"   📈 Encoding hızı: {metrics['total_duration']/(metrics['encode_time_ms']/1000):.2f}x realtime")
+        print(f"   📈 Encoding hızı: {encoding_speed:.2f}x realtime")
         print(f"==============================================\n")
         
         return {
