@@ -399,11 +399,192 @@ def concatenate_videos(video_urls: list, project_id: str) -> dict:
             print(f"🧹 Geçici dosyalar temizlendi")
 
 
+
 def gpu_test_loop_videos(
     video_urls: list,
     target_duration_seconds: int = 900,
     test_name: str = "gpu_test"
 ) -> dict:
+    """
+    🧪 GPU Test: Hazır videoları hedef süreye kadar döngüsel birleştir
+    """
+    from moviepy.editor import VideoFileClip, concatenate_videoclips
+    import shutil
+    import time
+    
+    print(f"\n🧪 ========== GPU TEST BAŞLADI ==========")
+    print(f"📦 Video URL Sayısı: {len(video_urls)}")
+    print(f"⏱️ Hedef Süre: {target_duration_seconds} saniye ({target_duration_seconds/60:.1f} dakika)")
+    print(f"📝 Test Adı: {test_name}")
+    print(f"=============================================\n")
+    
+    if not video_urls or len(video_urls) == 0:
+        return {
+            "success": False,
+            "error": "Video URL listesi boş",
+            "test_name": test_name
+        }
+    
+    temp_dir = tempfile.mkdtemp(prefix="gpu_test_")
+    metrics = {
+        "download_time_ms": 0,
+        "encode_time_ms": 0,
+        "upload_time_ms": 0,
+        "total_duration": 0,
+        "video_count": 0,
+        "input_videos": len(video_urls)
+    }
+    
+    try:
+        # 1. Videoları indir ve süreleri hesapla
+        print("📥 Videolar indiriliyor...")
+        download_start = time.time()
+        
+        downloaded_clips = []
+        total_source_duration = 0
+        
+        for i, url in enumerate(video_urls):
+            local_path = os.path.join(temp_dir, f"source_{i:03d}.mp4")
+            print(f"   ⬇️ ({i+1}/{len(video_urls)}) {url[:60]}...")
+            download_file(url, local_path)
+            
+            clip = VideoFileClip(local_path)
+            total_source_duration += clip.duration
+            downloaded_clips.append({"path": local_path, "clip": clip, "duration": clip.duration})
+            print(f"      ✅ Süre: {clip.duration:.2f}s")
+        
+        download_end = time.time()
+        metrics["download_time_ms"] = int((download_end - download_start) * 1000)
+        
+        print(f"\n📊 Kaynak videoların toplam süresi: {total_source_duration:.2f}s")
+        
+        # 2. Hedef süreye ulaşmak için kaç tekrar gerekli hesapla
+        repeat_count = int(target_duration_seconds / total_source_duration) + 1
+        print(f"🔄 Tekrar sayısı: {repeat_count} (hedef: {target_duration_seconds}s)")
+        
+        # 3. Döngüsel clip listesi oluştur
+        print("\n🎬 Video klipleri hazırlanıyor...")
+        all_clips = []
+        current_duration = 0
+        video_index = 0
+        
+        while current_duration < target_duration_seconds:
+            clip_info = downloaded_clips[video_index % len(downloaded_clips)]
+            
+            remaining = target_duration_seconds - current_duration
+            if clip_info["duration"] > remaining:
+                trimmed_clip = clip_info["clip"].subclip(0, remaining)
+                all_clips.append(trimmed_clip)
+                current_duration += remaining
+                print(f"   ✂️ Klip {len(all_clips)}: {remaining:.2f}s (kesildi)")
+            else:
+                all_clips.append(clip_info["clip"])
+                current_duration += clip_info["duration"]
+                print(f"   ➕ Klip {len(all_clips)}: {clip_info['duration']:.2f}s (toplam: {current_duration:.2f}s)")
+            
+            video_index += 1
+        
+        metrics["video_count"] = len(all_clips)
+        metrics["total_duration"] = current_duration
+        
+        print(f"\n📦 Toplam klip sayısı: {len(all_clips)}")
+        print(f"⏱️ Toplam süre: {current_duration:.2f}s ({current_duration/60:.1f} dakika)")
+        
+        # 4. Birleştir ve encode et (GPU!)
+        print("\n🔗 Videolar birleştiriliyor (GPU ENCODING)...")
+        encode_start = time.time()
+        
+        final_clip = concatenate_videoclips(all_clips, method="compose")
+        
+        output_path = os.path.join(temp_dir, f"{test_name}_output.mp4")
+        print(f"💾 Encode ediliyor: {output_path}")
+        
+        # ✅ DÜZELTİLMİŞ GPU ENCODING AYARLARI
+        final_clip.write_videofile(
+            output_path,
+            codec='h264_nvenc',       # NVIDIA GPU codec
+            audio_codec='aac',
+            preset='fast',            # 'fast', 'medium', 'slow' (p4 değil!)
+            ffmpeg_params=[
+                '-b:v', '5M',         # Bitrate
+                '-maxrate', '8M',     # Max bitrate
+                '-bufsize', '10M',    # Buffer size
+                '-gpu', '0',          # GPU index
+                '-rc', 'vbr',         # Rate control: variable bitrate
+                '-cq', '23',          # Quality: 0-51 (23 = good quality)
+                '-profile:v', 'high'  # H.264 profile
+            ],
+            fps=30,
+            threads=4,                # Thread sayısı
+            logger='bar'
+        )
+        
+        encode_end = time.time()
+        metrics["encode_time_ms"] = int((encode_end - encode_start) * 1000)
+        
+        # Kaynak klipleri kapat
+        for clip_info in downloaded_clips:
+            clip_info["clip"].close()
+        final_clip.close()
+        
+        print(f"\n✅ Encoding tamamlandı!")
+        print(f"   ⏱️ Encoding süresi: {metrics['encode_time_ms']/1000:.2f}s")
+        
+        # 5. CDN'e yükle
+        print("\n☁️ CDN'e yükleniyor...")
+        upload_start = time.time()
+        
+        cdn_url = upload_video(output_path, f"gpu_test_{test_name}")
+        
+        upload_end = time.time()
+        metrics["upload_time_ms"] = int((upload_end - upload_start) * 1000)
+        
+        # Performans özeti
+        total_time_ms = metrics["download_time_ms"] + metrics["encode_time_ms"] + metrics["upload_time_ms"]
+        
+        print(f"\n🎉 ========== GPU TEST TAMAMLANDI ==========")
+        print(f"🔗 CDN URL: {cdn_url}")
+        print(f"\n📊 PERFORMANS METRİKLERİ:")
+        print(f"   ⬇️ İndirme: {metrics['download_time_ms']/1000:.2f}s")
+        print(f"   🎬 Encoding: {metrics['encode_time_ms']/1000:.2f}s")
+        print(f"   ⬆️ Yükleme: {metrics['upload_time_ms']/1000:.2f}s")
+        print(f"   ⏱️ TOPLAM: {total_time_ms/1000:.2f}s")
+        print(f"\n   📦 Video sayısı: {metrics['video_count']}")
+        print(f"   ⏱️ Video süresi: {metrics['total_duration']:.2f}s")
+        print(f"   📈 Encoding hızı: {metrics['total_duration']/(metrics['encode_time_ms']/1000):.2f}x realtime")
+        print(f"==============================================\n")
+        
+        return {
+            "success": True,
+            "video_url": cdn_url,
+            "test_name": test_name,
+            "metrics": metrics
+        }
+        
+    except Exception as e:
+        print(f"\n❌ HATA: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        
+        return {
+            "success": False,
+            "error": str(e),
+            "test_name": test_name,
+            "metrics": metrics
+        }
+        
+    finally:
+        # Temizlik
+        if os.path.exists(temp_dir):
+            shutil.rmtree(temp_dir)
+            print(f"🧹 Geçici dosyalar temizlendi: {temp_dir}")
+
+
+# def gpu_test_loop_videos(
+#     video_urls: list,
+#     target_duration_seconds: int = 900,
+#     test_name: str = "gpu_test"
+# ) -> dict:
     """
     🧪 GPU Test: Hazır videoları hedef süreye kadar döngüsel birleştir
     
