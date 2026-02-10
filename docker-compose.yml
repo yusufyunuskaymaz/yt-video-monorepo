@@ -1,4 +1,3 @@
-
 services:
   # PostgreSQL Veritabanı
   postgres:
@@ -37,6 +36,7 @@ services:
       - PORT=3000
       - PYTHON_API_URL=http://video-api:8000
       - NODE_CALLBACK_URL=http://backend:3000/webhook
+      - FLUX_API_URL=${FLUX_API_URL}
     volumes:
       - ./yt-auto-video/src:/app/src
       - ./yt-auto-video/public:/app/public
