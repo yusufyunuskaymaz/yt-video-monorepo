@@ -7,6 +7,7 @@ on:
       - "yt-video/requirements.txt"
       - "yt-video/Dockerfile.runpod.base"
       - "yt-video/startup.sh"
+      - "ai-service/**"
     branches:
       - main
   workflow_dispatch: # Manuel tetikleme

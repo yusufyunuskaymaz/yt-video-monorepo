@@ -1,7 +1,7 @@
 # ========================================
-# RunPod Base Image - Optimized
+# RunPod Base Image - Video + FLUX
 # ========================================
-# Kod GİTHUB'dan gelecek, bu sadece ortam hazırlığı
+# Video işleme (FFmpeg, NVENC) + FLUX resim üretimi
 
 FROM nvidia/cuda:12.2.0-runtime-ubuntu22.04
 
@@ -25,8 +25,17 @@ WORKDIR /app
 # Python bağımlılıklarını kopyala (ayrı layer - cache için)
 COPY requirements.txt .
 
-# Pip install
+# Pip install - Video deps
 RUN pip3 install --no-cache-dir -r requirements.txt
+
+# FLUX deps (ayrı layer - video deps değişmezse cache'lenir)
+RUN pip3 install --no-cache-dir \
+    diffusers==0.30.0 \
+    transformers==4.44.0 \
+    accelerate==0.33.0 \
+    sentencepiece \
+    protobuf \
+    safetensors
 
 # Workspace directory oluştur
 RUN mkdir -p /workspace
@@ -35,6 +44,6 @@ RUN mkdir -p /workspace
 COPY startup.sh /startup.sh
 RUN chmod +x /startup.sh
 
-EXPOSE 8000
+EXPOSE 8000 8888
 
 CMD ["/startup.sh"]

@@ -37,8 +37,14 @@ echo "🔧 FFmpeg: $(ffmpeg -version | head -n1)"
 echo "🔧 NVENC: $(ffmpeg -encoders 2>/dev/null | grep nvenc | wc -l) encoders available"
 
 echo "✅ Kod hazır: $CODE_DIR"
-echo "🚀 API başlatılıyor..."
+echo "🚀 API'ler başlatılıyor..."
 
-# API'yi başlat
+# FLUX API'yi arka planda başlat (port 8888)
+echo "🎨 FLUX API başlatılıyor (port 8888)..."
+cd $CODE_DIR/ai-service
+python3 -c "import uvicorn; uvicorn.run('api:app', host='0.0.0.0', port=8888)" &
+
+# Video API'yi ön planda başlat (port 8000)
+echo "🎬 Video API başlatılıyor (port 8000)..."
 cd $CODE_DIR/yt-video/api
 exec python3 -m uvicorn main:app --host 0.0.0.0 --port 8000
