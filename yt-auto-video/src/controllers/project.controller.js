@@ -637,7 +637,7 @@ async function generateFullPipeline(req, res) {
     const localPaths = {};
 
     // ============ ADIM 1: GÖRSELLER (lokal) ============
-    console.log(`\n📍 ADIM 1/5: Görseller oluşturuluyor (lokal)...`);
+    console.log(`\n📍 ADIM 1/6: Görseller oluşturuluyor (lokal)...`);
     const imageService = require("../services/image.service");
 
     const pendingImages = project.scenes.filter((s) => !s.imageUrl);
@@ -671,7 +671,7 @@ async function generateFullPipeline(req, res) {
     console.log(`✅ ADIM 1 TAMAMLANDI: ${results.images.processed} görsel`);
 
     // ============ ADIM 2: SESLER (lokal) ============
-    console.log(`\n📍 ADIM 2/5: Sesler oluşturuluyor (lokal)...`);
+    console.log(`\n📍 ADIM 2/6: Sesler oluşturuluyor (lokal)...`);
     const audioService = require("../services/audio.service");
 
     const projectAfterImages = await projectService.getProject(id);
@@ -716,7 +716,7 @@ async function generateFullPipeline(req, res) {
     console.log(`✅ ADIM 2 TAMAMLANDI: ${results.audio.processed} ses`);
 
     // ============ ADIM 3: VİDEOLAR (lokal - CDN yok) ============
-    console.log(`\n📍 ADIM 3/5: Videolar oluşturuluyor (lokal)...`);
+    console.log(`\n📍 ADIM 3/6: Videolar oluşturuluyor (lokal)...`);
     const videoService = require("../services/video.service");
 
     const isHealthy = await videoService.checkPythonApiHealth();
@@ -767,7 +767,7 @@ async function generateFullPipeline(req, res) {
     console.log(`✅ ADIM 3 TAMAMLANDI: ${results.videos.processed} video`);
 
     // ============ ADIM 4: BİRLEŞTİRME (lokal - CDN yok) ============
-    console.log(`\n📍 ADIM 4/5: Birleştirme yapılıyor (lokal)...`);
+    console.log(`\n📍 ADIM 4/6: Birleştirme yapılıyor (lokal)...`);
 
     if (isHealthy) {
       const projectAfterVideos = await projectService.getProject(id);
@@ -942,6 +942,20 @@ async function generateFullPipeline(req, res) {
     }
 
     console.log(`✅ ADIM 6 TAMAMLANDI`);
+
+    // Proje dizinini temizle (RunPod disk alanı)
+    try {
+      const PYTHON_API_URL =
+        process.env.PYTHON_API_URL || "http://localhost:8000";
+      await fetch(`${PYTHON_API_URL}/api/video/cleanup-project`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ project_id: id }),
+      });
+      console.log(`🧹 RunPod proje dizini temizlendi`);
+    } catch (cleanupErr) {
+      console.log(`⚠️ Temizleme hatası: ${cleanupErr.message}`);
+    }
 
     // Proje durumunu güncelle
     await projectService.updateProjectStatus(id, "completed");

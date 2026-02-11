@@ -430,12 +430,10 @@ def concatenate_videos(video_urls: list, project_id: str) -> dict:
             "error": str(e),
             "project_id": project_id
         }
-        
-    finally:
-        # Proje dizinini temizle (tüm ara dosyalar)
-        if os.path.exists(project_dir):
-            shutil.rmtree(project_dir)
-            print(f"🧹 Proje dosyaları temizlendi: {project_dir}")
+    
+    # NOT: Proje dizinini silmiyoruz!
+    # Toplu CDN upload (ADIM 6) için dosyalar lazım.
+    # Temizleme Node.js tarafından /cleanup-project ile yapılır.
 
 
 

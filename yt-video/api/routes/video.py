@@ -370,6 +370,26 @@ async def upload_project_assets(request: UploadProjectAssetsRequest):
     }
 
 
+class CleanupProjectRequest(BaseModel):
+    project_id: str | int
+
+
+@router.post("/cleanup-project")
+async def cleanup_project(request: CleanupProjectRequest):
+    """Pipeline sonunda proje dizinini temizle"""
+    import shutil
+    from services.video_service import get_project_dir
+    
+    project_dir = get_project_dir(str(request.project_id))
+    
+    if os.path.exists(project_dir):
+        shutil.rmtree(project_dir)
+        print(f"🧹 Proje dosyaları temizlendi: {project_dir}")
+        return {"success": True, "message": f"Proje dizini silindi: {project_dir}"}
+    else:
+        return {"success": True, "message": "Dizin zaten mevcut değil"}
+
+
 @router.get("/health")
 async def health_check():
     """API sağlık kontrolü"""
