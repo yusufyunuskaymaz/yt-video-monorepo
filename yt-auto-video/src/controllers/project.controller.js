@@ -599,8 +599,11 @@ async function mergeAllVideos(req, res) {
 }
 
 /**
- * Tam pipeline - Resim → Ses → Video → Birleştirme
+ * Tam pipeline - Resim → Ses → Video → Birleştirme → Final
  * POST /api/projects/:id/generate-pipeline
+ *
+ * OPTİMİZE: Tüm ara adımlar lokal dosya kullanır.
+ * Sadece final video CDN'e yüklenir.
  */
 async function generateFullPipeline(req, res) {
   try {
@@ -618,9 +621,9 @@ async function generateFullPipeline(req, res) {
     console.log(`\n🚀 ========== TAM PIPELINE BAŞLATILIYOR ==========`);
     console.log(`📁 Proje: ${project.title}`);
     console.log(`🎬 Toplam sahne: ${project.scenes.length}`);
+    console.log(`⚡ MOD: Lokal dosya (CDN sadece final video)`);
     console.log(`===================================================\n`);
 
-    // Proje durumunu güncelle
     await projectService.updateProjectStatus(id, "pipeline_running");
 
     const results = {
@@ -630,10 +633,12 @@ async function generateFullPipeline(req, res) {
       merge: { processed: 0, failed: 0 },
     };
 
-    // ============ ADIM 1: GÖRSELLER ============
-    console.log(`\n📍 ADIM 1/4: Görseller oluşturuluyor...`);
+    // Lokal path'leri takip et (CDN URL yerine)
+    const localPaths = {};
+
+    // ============ ADIM 1: GÖRSELLER (lokal) ============
+    console.log(`\n📍 ADIM 1/5: Görseller oluşturuluyor (lokal)...`);
     const imageService = require("../services/image.service");
-    const r2Service = require("../services/r2.service");
 
     const pendingImages = project.scenes.filter((s) => !s.imageUrl);
     for (const scene of pendingImages) {
@@ -645,13 +650,17 @@ async function generateFullPipeline(req, res) {
           sceneNumber: scene.sceneNumber,
         });
 
-        if (imageResult && imageResult.cdnUrl) {
+        if (imageResult) {
+          const path = imageResult.localPath || imageResult.cdnUrl;
+          localPaths[`image_${scene.sceneNumber}`] = path;
           await projectService.updateScene(scene.id, {
-            imageUrl: imageResult.cdnUrl,
+            imageUrl: path,
             status: "image_done",
           });
           results.images.processed++;
-          console.log(`   ✅ Sahne ${scene.sceneNumber} görsel tamamlandı`);
+          console.log(
+            `   ✅ Sahne ${scene.sceneNumber} görsel tamamlandı (lokal)`
+          );
         }
       } catch (error) {
         await projectService.updateScene(scene.id, { status: "failed" });
@@ -661,11 +670,10 @@ async function generateFullPipeline(req, res) {
     }
     console.log(`✅ ADIM 1 TAMAMLANDI: ${results.images.processed} görsel`);
 
-    // ============ ADIM 2: SESLER ============
-    console.log(`\n📍 ADIM 2/4: Sesler oluşturuluyor...`);
+    // ============ ADIM 2: SESLER (lokal) ============
+    console.log(`\n📍 ADIM 2/5: Sesler oluşturuluyor (lokal)...`);
     const audioService = require("../services/audio.service");
 
-    // Güncel projeyi al
     const projectAfterImages = await projectService.getProject(id);
     const pendingAudio = projectAfterImages.scenes.filter(
       (s) => !s.audioUrl && s.narration
@@ -685,15 +693,19 @@ async function generateFullPipeline(req, res) {
           sceneNumber: scene.sceneNumber,
         });
         if (audioResult && audioResult.audioUrl) {
+          const path = audioResult.localPath || audioResult.audioUrl;
+          localPaths[`audio_${scene.sceneNumber}`] = path;
           await projectService.updateScene(scene.id, {
-            audioUrl: audioResult.audioUrl,
+            audioUrl: path,
             audioDuration: audioResult.duration,
             audioVoice: voice,
             audioTemperature: temperature,
             status: "audio_done",
           });
           results.audio.processed++;
-          console.log(`   ✅ Sahne ${scene.sceneNumber} ses tamamlandı`);
+          console.log(
+            `   ✅ Sahne ${scene.sceneNumber} ses tamamlandı (lokal)`
+          );
         }
       } catch (error) {
         await projectService.updateScene(scene.id, { status: "audio_failed" });
@@ -703,11 +715,10 @@ async function generateFullPipeline(req, res) {
     }
     console.log(`✅ ADIM 2 TAMAMLANDI: ${results.audio.processed} ses`);
 
-    // ============ ADIM 3: VİDEOLAR ============
-    console.log(`\n📍 ADIM 3/4: Videolar oluşturuluyor...`);
+    // ============ ADIM 3: VİDEOLAR (lokal - CDN yok) ============
+    console.log(`\n📍 ADIM 3/5: Videolar oluşturuluyor (lokal)...`);
     const videoService = require("../services/video.service");
 
-    // Python API kontrolü
     const isHealthy = await videoService.checkPythonApiHealth();
     if (!isHealthy) {
       console.log(`   ⚠️ Python API erişilemez, video adımı atlanıyor`);
@@ -723,23 +734,26 @@ async function generateFullPipeline(req, res) {
             status: "video_processing",
           });
           const videoResult = await videoService.generateVideoSync({
-            imageUrl: scene.imageUrl,
+            imageUrl: scene.imageUrl, // lokal path olabilir
             sceneId: scene.id,
-            // Ses süresine göre video süresi (ses yoksa 10 saniye)
             duration: Math.ceil(scene.audioDuration) || 10,
-            // Alternatif pan yönü: Tek sahneler yukarı, çift sahneler aşağı
             panDirection:
               scene.sceneNumber % 2 === 1 ? "vertical" : "vertical_reverse",
             projectId: id,
             sceneNumber: scene.sceneNumber,
+            skipCdn: true, // ← LOKAL KAL
           });
           if (videoResult.success) {
+            const path = videoResult.localPath || videoResult.videoUrl;
+            localPaths[`video_${scene.sceneNumber}`] = path;
             await projectService.updateScene(scene.id, {
-              videoUrl: videoResult.videoUrl,
+              videoUrl: path,
               status: "video_done",
             });
             results.videos.processed++;
-            console.log(`   ✅ Sahne ${scene.sceneNumber} video tamamlandı`);
+            console.log(
+              `   ✅ Sahne ${scene.sceneNumber} video tamamlandı (lokal)`
+            );
           }
         } catch (error) {
           await projectService.updateScene(scene.id, {
@@ -752,8 +766,8 @@ async function generateFullPipeline(req, res) {
     }
     console.log(`✅ ADIM 3 TAMAMLANDI: ${results.videos.processed} video`);
 
-    // ============ ADIM 4: BİRLEŞTİRME ============
-    console.log(`\n📍 ADIM 4/4: Birleştirme yapılıyor...`);
+    // ============ ADIM 4: BİRLEŞTİRME (lokal - CDN yok) ============
+    console.log(`\n📍 ADIM 4/5: Birleştirme yapılıyor (lokal)...`);
 
     if (isHealthy) {
       const projectAfterVideos = await projectService.getProject(id);
@@ -765,21 +779,24 @@ async function generateFullPipeline(req, res) {
         try {
           await projectService.updateScene(scene.id, { status: "merging" });
           const mergeResult = await videoService.mergeVideoWithAudio({
-            videoUrl: scene.videoUrl,
-            audioUrl: scene.audioUrl,
+            videoUrl: scene.videoUrl, // lokal path
+            audioUrl: scene.audioUrl, // lokal path
             sceneId: scene.id,
             narration: scene.narration,
             projectId: id,
             sceneNumber: scene.sceneNumber,
+            skipCdn: true, // ← LOKAL KAL
           });
           if (mergeResult.success) {
+            const path = mergeResult.localPath || mergeResult.mergedVideoUrl;
+            localPaths[`merged_${scene.sceneNumber}`] = path;
             await projectService.updateScene(scene.id, {
-              mergedVideoUrl: mergeResult.mergedVideoUrl,
+              mergedVideoUrl: path,
               status: "completed",
             });
             results.merge.processed++;
             console.log(
-              `   ✅ Sahne ${scene.sceneNumber} birleştirme tamamlandı`
+              `   ✅ Sahne ${scene.sceneNumber} birleştirme tamamlandı (lokal)`
             );
           }
         } catch (error) {
@@ -793,13 +810,14 @@ async function generateFullPipeline(req, res) {
     }
     console.log(`✅ ADIM 4 TAMAMLANDI: ${results.merge.processed} birleştirme`);
 
-    // ============ ADIM 5: FINAL VİDEO (TÜM SAHNELERİ BİRLEŞTİR) ============
-    console.log(`\n📍 ADIM 5/5: Final video oluşturuluyor...`);
+    // ============ ADIM 5: FINAL VIDEO (concat → CDN) ============
+    console.log(
+      `\n📍 ADIM 5/6: Final video oluşturuluyor (CDN'e yükleniyor)...`
+    );
 
-    // Güncel projeyi al
     const projectAfterMerge = await projectService.getProject(id);
 
-    // Tüm mergedVideoUrl'leri sahne sırasına göre al
+    // Tüm mergedVideoUrl'leri sahne sırasına göre al (lokal path'ler)
     const allMergedVideos = projectAfterMerge.scenes
       .filter((s) => s.mergedVideoUrl)
       .sort((a, b) => a.sceneNumber - b.sceneNumber)
@@ -815,7 +833,6 @@ async function generateFullPipeline(req, res) {
         });
 
         if (concatResult.success) {
-          // Proje'ye final video URL'sini kaydet
           await projectService.updateProject(id, {
             finalVideoUrl: concatResult.videoUrl,
           });
@@ -836,6 +853,96 @@ async function generateFullPipeline(req, res) {
 
     console.log(`✅ ADIM 5 TAMAMLANDI`);
 
+    // ============ ADIM 6: TOPLU CDN UPLOAD + DB GÜNCELLE ============
+    console.log(
+      `\n📍 ADIM 6/6: Dosyalar CDN'e yükleniyor ve DB güncelleniyor...`
+    );
+
+    try {
+      // Lokal path'lerden CDN upload listesi oluştur
+      // Ses hariç: resim, ham video, birleştirilmiş video
+      const filesToUpload = [];
+
+      const projectFinal = await projectService.getProject(id);
+      for (const scene of projectFinal.scenes) {
+        // Resim
+        if (scene.imageUrl && scene.imageUrl.startsWith("/")) {
+          filesToUpload.push({
+            local_path: scene.imageUrl,
+            type: "image",
+            scene_number: scene.sceneNumber,
+            scene_id: scene.id,
+            field: "imageUrl",
+          });
+        }
+
+        // Ham video
+        if (scene.videoUrl && scene.videoUrl.startsWith("/")) {
+          filesToUpload.push({
+            local_path: scene.videoUrl,
+            type: "video",
+            scene_number: scene.sceneNumber,
+            scene_id: scene.id,
+            field: "videoUrl",
+          });
+        }
+
+        // Birleştirilmiş video
+        if (scene.mergedVideoUrl && scene.mergedVideoUrl.startsWith("/")) {
+          filesToUpload.push({
+            local_path: scene.mergedVideoUrl,
+            type: "merged",
+            scene_number: scene.sceneNumber,
+            scene_id: scene.id,
+            field: "mergedVideoUrl",
+          });
+        }
+      }
+
+      if (filesToUpload.length > 0) {
+        console.log(`   ☁️ ${filesToUpload.length} dosya CDN'e yükleniyor...`);
+
+        const uploadResult = await videoService.uploadProjectAssets({
+          projectId: id,
+          files: filesToUpload.map((f) => ({
+            local_path: f.local_path,
+            type: f.type,
+            scene_number: f.scene_number,
+          })),
+        });
+
+        if (uploadResult.success && uploadResult.uploads) {
+          // DB'yi CDN URL'leriyle güncelle
+          for (const upload of uploadResult.uploads) {
+            // Bu upload'a karşılık gelen dosyayı bul
+            const matchingFiles = filesToUpload.filter(
+              (f) =>
+                f.scene_number === upload.scene_number && f.type === upload.type
+            );
+
+            for (const match of matchingFiles) {
+              const updateData = {};
+              updateData[match.field] = upload.cdn_url;
+              await projectService.updateScene(match.scene_id, updateData);
+              console.log(
+                `   📝 DB güncellendi: Sahne ${match.scene_number} ${match.field}`
+              );
+            }
+          }
+          console.log(
+            `   ✅ ${uploadResult.uploaded} dosya CDN'e yüklendi, DB güncellendi`
+          );
+        }
+      } else {
+        console.log(`   ℹ️ CDN'e yüklenecek lokal dosya yok`);
+      }
+    } catch (error) {
+      console.log(`   ⚠️ Toplu CDN upload hatası: ${error.message}`);
+      // Pipeline'ı durdurmuyoruz, final video zaten CDN'de
+    }
+
+    console.log(`✅ ADIM 6 TAMAMLANDI`);
+
     // Proje durumunu güncelle
     await projectService.updateProjectStatus(id, "completed");
 
@@ -852,6 +959,7 @@ async function generateFullPipeline(req, res) {
     console.log(
       `📊 Birleştirme: ${results.merge.processed} başarılı, ${results.merge.failed} başarısız`
     );
+    console.log(`⚡ CDN Upload: Toplu (pipeline sonunda)`);
     console.log(`=============================================\n`);
 
     res.json({

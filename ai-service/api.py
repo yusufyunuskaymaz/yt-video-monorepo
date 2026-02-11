@@ -24,6 +24,7 @@ app.add_middleware(
 # ============ Config ============
 MODELS_DIR = os.getenv("MODELS_DIR", "/app/models")
 OUTPUTS_DIR = os.getenv("OUTPUTS_DIR", "/app/outputs")
+PROJECTS_DIR = "/tmp/projects"  # Video API ile paylaşımlı dizin
 
 # R2 CDN Config (env'den)
 R2_ENDPOINT = os.getenv("R2_ENDPOINT", "")
@@ -80,6 +81,7 @@ class ImageRequest(BaseModel):
 class ImageResponse(BaseModel):
     success: bool
     cdn_url: Optional[str] = None
+    local_path: Optional[str] = None
     filename: Optional[str] = None
     generation_time: Optional[float] = None
     error: Optional[str] = None
@@ -101,7 +103,8 @@ def load_flux():
     flux_pipe = FluxPipeline.from_pretrained(
         "black-forest-labs/FLUX.1-schnell",
         torch_dtype=torch.bfloat16,
-        cache_dir=MODELS_DIR
+        cache_dir=MODELS_DIR,
+        token=os.getenv("HF_TOKEN")
     )
 
     # GPU VRAM kontrolü
@@ -195,18 +198,27 @@ async def generate_image(req: ImageRequest):
         else:
             filename = f"img_{unique_id}.png"
 
-        # Kaydet
-        os.makedirs(OUTPUTS_DIR, exist_ok=True)
-        filepath = os.path.join(OUTPUTS_DIR, filename)
+        # Kaydet - proje dizinine veya outputs'a
+        if req.project_id and not req.upload_to_cdn:
+            # Proje dizinine kaydet (video API ile paylaşımlı)
+            save_dir = os.path.join(PROJECTS_DIR, str(req.project_id))
+            os.makedirs(save_dir, exist_ok=True)
+        else:
+            save_dir = OUTPUTS_DIR
+            os.makedirs(save_dir, exist_ok=True)
+
+        filepath = os.path.join(save_dir, filename)
         image.save(filepath, "PNG")
 
-        # CDN'e yükle
+        # CDN'e yükle veya lokal path döndür
         cdn_url = None
+        local_path = None
         if req.upload_to_cdn and R2_ENDPOINT:
             key = f"images/{filename}"
             cdn_url = upload_to_r2(filepath, key, "image/png")
             os.remove(filepath)  # CDN'e yüklendi, sil
         else:
+            local_path = filepath
             cdn_url = f"local://{filepath}"
 
         print(f"✅ Resim üretildi: {filename} ({generation_time}s)")
@@ -215,6 +227,7 @@ async def generate_image(req: ImageRequest):
         return ImageResponse(
             success=True,
             cdn_url=cdn_url,
+            local_path=local_path,
             filename=filename,
             generation_time=generation_time
         )

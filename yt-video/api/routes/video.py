@@ -31,6 +31,7 @@ class GenerateVideoRequest(BaseModel):
     callback_url: Optional[str] = None
     project_id: Optional[str | int] = None
     scene_number: Optional[int] = None
+    skip_cdn: Optional[bool] = False
 
 
 class MergeVideoAudioRequest(BaseModel):
@@ -41,6 +42,7 @@ class MergeVideoAudioRequest(BaseModel):
     callback_url: Optional[str] = None
     project_id: Optional[str | int] = None
     scene_number: Optional[int] = None
+    skip_cdn: Optional[bool] = False
 
 
 class GenerateVideoResponse(BaseModel):
@@ -149,7 +151,8 @@ async def generate_video_sync(request: GenerateVideoRequest):
         pan_direction=request.pan_direction,
         subtitles=subtitle_dicts,
         project_id=str(request.project_id) if request.project_id else None,
-        scene_number=request.scene_number
+        scene_number=request.scene_number,
+        skip_cdn=request.skip_cdn
     )
     
     return result
@@ -174,7 +177,8 @@ async def merge_video_audio_endpoint(request: MergeVideoAudioRequest):
         scene_id=request.scene_id,
         narration=request.narration,
         project_id=str(request.project_id) if request.project_id else None,
-        scene_number=request.scene_number
+        scene_number=request.scene_number,
+        skip_cdn=request.skip_cdn
     )
     
     return result
@@ -243,6 +247,127 @@ async def gpu_test_endpoint(request: GpuTestRequest):
     )
     
     return result
+
+
+# Download to local - Harici URL'i proje dizinine indir
+class DownloadToLocalRequest(BaseModel):
+    url: str
+    project_id: str | int
+    filename: str
+
+
+@router.post("/download-to-local")
+async def download_to_local(request: DownloadToLocalRequest):
+    """Harici URL'i proje dizinine indir (CDN atlama)"""
+    from services.video_service import get_project_dir, download_file
+    
+    try:
+        project_dir = get_project_dir(str(request.project_id))
+        local_path = os.path.join(project_dir, request.filename)
+        
+        print(f"📥 İndiriliyor: {request.url[:80]}...")
+        print(f"📂 Hedef: {local_path}")
+        
+        download_file(request.url, local_path)
+        
+        print(f"✅ İndirildi: {local_path}")
+        
+        return {
+            "success": True,
+            "local_path": local_path,
+            "filename": request.filename
+        }
+    except Exception as e:
+        print(f"❌ İndirme hatası: {str(e)}")
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+
+# Toplu CDN Upload - Proje dosyalarını CDN'e yükle
+class UploadProjectAssetsRequest(BaseModel):
+    project_id: str | int
+    files: List[dict]  # [{"local_path": "...", "type": "image|video|merged", "scene_number": 1}]
+
+
+class FileUploadItem(BaseModel):
+    local_path: str
+    type: str  # image, video, merged
+    scene_number: int
+
+
+@router.post("/upload-project-assets")
+async def upload_project_assets(request: UploadProjectAssetsRequest):
+    """
+    Proje dosyalarını toplu CDN'e yükle.
+    Pipeline sonunda çağrılır - tüm lokal dosyaları CDN'e yükler.
+    """
+    from services.cdn_service import upload_file
+    import time
+    
+    project_id = str(request.project_id)
+    results = []
+    failed = 0
+    
+    print(f"\n☁️ ========== TOPLU CDN UPLOAD ==========")
+    print(f"📁 Proje: {project_id}")
+    print(f"📦 Dosya sayısı: {len(request.files)}")
+    print(f"==========================================\n")
+    
+    for item in request.files:
+        local_path = item.get("local_path", "")
+        file_type = item.get("type", "unknown")
+        scene_number = item.get("scene_number", 0)
+        
+        if not os.path.exists(local_path):
+            print(f"⚠️ Dosya bulunamadı: {local_path}")
+            failed += 1
+            continue
+        
+        try:
+            timestamp = int(time.time())
+            scene_tag = str(scene_number).zfill(3)
+            
+            # Dosya tipine göre key ve content_type belirle
+            if file_type == "image":
+                ext = os.path.splitext(local_path)[1] or ".png"
+                key = f"images/{project_id}_scene_{scene_tag}_{timestamp}{ext}"
+                content_type = "image/png"
+            elif file_type == "video":
+                key = f"videos/{project_id}_scene_{scene_tag}_{timestamp}.mp4"
+                content_type = "video/mp4"
+            elif file_type == "merged":
+                key = f"videos/{project_id}_merged_{scene_tag}_{timestamp}.mp4"
+                content_type = "video/mp4"
+            else:
+                key = f"files/{project_id}_{scene_tag}_{timestamp}"
+                content_type = "application/octet-stream"
+            
+            cdn_url = upload_file(local_path, key, content_type)
+            
+            results.append({
+                "scene_number": scene_number,
+                "type": file_type,
+                "cdn_url": cdn_url,
+                "local_path": local_path
+            })
+            
+            print(f"✅ [{file_type}] Sahne {scene_number} → {cdn_url}")
+            
+        except Exception as e:
+            print(f"❌ [{file_type}] Sahne {scene_number} yükleme hatası: {str(e)}")
+            failed += 1
+    
+    print(f"\n🎉 Toplu upload tamamlandı: {len(results)} başarılı, {failed} başarısız\n")
+    
+    return {
+        "success": True,
+        "uploads": results,
+        "total": len(request.files),
+        "uploaded": len(results),
+        "failed": failed
+    }
 
 
 @router.get("/health")

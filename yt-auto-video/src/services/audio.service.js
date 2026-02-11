@@ -62,14 +62,51 @@ async function generateAudio({
     const falAudioUrl = result.data.audio_url || result.data.audio?.url;
     console.log("🔊 Fal.ai Audio URL:", falAudioUrl);
 
-    // R2'ye yükle - süreyi ölç
+    // Ses süresini al (varsa)
+    const duration =
+      result.data.duration || result.data.audio?.duration || null;
+
+    // Eğer projectId varsa, RunPod'daki /tmp/projects/{id}/ dizinine indir
+    const PYTHON_API_URL =
+      process.env.PYTHON_API_URL || "http://localhost:8000";
+    if (projectId) {
+      console.log("📥 Audio RunPod'a indiriliyor...");
+      const downloadTimer = startTimer("AUDIO_DOWNLOAD_TO_RUNPOD");
+
+      const dlResponse = await fetch(
+        `${PYTHON_API_URL}/api/video/download-to-local`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            url: falAudioUrl,
+            project_id: String(projectId),
+            filename: `audio_scene_${String(sceneNumber).padStart(3, "0")}.mp3`,
+          }),
+        }
+      );
+
+      const dlResult = await dlResponse.json();
+      endTimer(downloadTimer, { scene: sceneNumber, projectId: projectId });
+
+      if (dlResult.success) {
+        console.log("📂 Lokal:", dlResult.local_path);
+        return {
+          success: true,
+          audioUrl: dlResult.local_path,
+          localPath: dlResult.local_path,
+          falUrl: falAudioUrl,
+          duration: duration,
+          voice: voice,
+          temperature: temperature,
+          text: text,
+        };
+      }
+    }
+
+    // Fallback: R2'ye yükle (projectId yoksa)
     const audioId = generateId();
-    const fileName = projectId
-      ? `audio/${projectId}_scene_${String(sceneNumber).padStart(
-          3,
-          "0"
-        )}_${audioId}.mp3`
-      : `audio/${sceneId}_${audioId}.mp3`;
+    const fileName = `audio/${sceneId}_${audioId}.mp3`;
 
     console.log("☁️ R2 CDN'e yükleniyor...");
     const r2Timer = startTimer("R2_AUDIO_UPLOAD");
@@ -83,10 +120,6 @@ async function generateAudio({
     console.log("\n🎉 ========== AUDIO CDN URL ==========");
     console.log("🔗", cdnUrl);
     console.log("======================================\n");
-
-    // Ses süresini al (varsa)
-    const duration =
-      result.data.duration || result.data.audio?.duration || null;
 
     return {
       success: true,

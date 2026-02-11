@@ -66,7 +66,7 @@ async function generateImage({ prompt: promptData, projectId, sceneNumber }) {
         num_inference_steps: 4,
         width: 1920,
         height: 1080,
-        upload_to_cdn: true,
+        upload_to_cdn: false,
         project_id: projectId ? String(projectId) : null,
         scene_number: sceneNumber || null,
       }),
@@ -82,12 +82,16 @@ async function generateImage({ prompt: promptData, projectId, sceneNumber }) {
     console.log("✅ Resim başarıyla üretildi!");
     console.log(`⏱️ Süre: ${result.generation_time}s`);
 
-    console.log("\n🎉 ========== CDN URL ==========");
-    console.log("🔗", result.cdn_url);
-    console.log("================================\n");
+    if (result.local_path) {
+      console.log("📂 Lokal:", result.local_path);
+    }
+    if (result.cdn_url) {
+      console.log("🔗 CDN:", result.cdn_url);
+    }
 
     return {
       cdnUrl: result.cdn_url,
+      localPath: result.local_path,
       prompt: promptData,
       generationTime: result.generation_time,
       filename: result.filename,

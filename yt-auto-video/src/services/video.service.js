@@ -75,6 +75,7 @@ async function generateVideoSync({
   subtitles = null,
   projectId = null,
   sceneNumber = null,
+  skipCdn = false,
 }) {
   console.log(`\n🎬 Video üretimi başlatılıyor (sync)...`);
 
@@ -89,14 +90,16 @@ async function generateVideoSync({
         subtitles: subtitles,
         project_id: projectId,
         scene_number: sceneNumber,
+        skip_cdn: skipCdn,
       },
-      { timeout: 180000 } // 3 dakika timeout
+      { timeout: 180000 }
     );
 
     console.log(`✅ Video üretildi: ${response.data.video_url}`);
     return {
       success: response.data.success,
       videoUrl: response.data.video_url,
+      localPath: response.data.local_path,
       sceneId: response.data.scene_id,
       duration: response.data.duration,
     };
@@ -138,12 +141,14 @@ async function mergeVideoWithAudio({
   narration = null,
   projectId = null,
   sceneNumber = null,
+  skipCdn = false,
 }) {
   console.log(`\n🔗 Video + Ses birleştirme isteği gönderiliyor...`);
   console.log(`   Scene ID: ${sceneId}`);
-  console.log(`   Video URL: ${videoUrl}`);
-  console.log(`   Audio URL: ${audioUrl}`);
+  console.log(`   Video: ${videoUrl}`);
+  console.log(`   Audio: ${audioUrl}`);
   console.log(`   Altyazı: ${narration ? "Var" : "Yok"}`);
+  console.log(`   CDN: ${skipCdn ? "Hayır (lokal)" : "Evet"}`);
 
   try {
     const response = await axios.post(
@@ -155,8 +160,9 @@ async function mergeVideoWithAudio({
         narration: narration,
         project_id: projectId,
         scene_number: sceneNumber,
+        skip_cdn: skipCdn,
       },
-      { timeout: 600000 } // 10 dakika timeout (altyazı ekleme uzun sürebilir)
+      { timeout: 600000 }
     );
 
     if (response.data.success) {
@@ -166,6 +172,7 @@ async function mergeVideoWithAudio({
       return {
         success: true,
         mergedVideoUrl: response.data.merged_video_url,
+        localPath: response.data.local_path,
         sceneId: response.data.scene_id,
         duration: response.data.duration,
       };
@@ -291,12 +298,59 @@ async function gpuTest({
   }
 }
 
+/**
+ * Proje dosyalarını toplu CDN'e yükle
+ * @param {object} params - { projectId, files: [{local_path, type, scene_number}] }
+ * @returns {Promise<object>}
+ */
+async function uploadProjectAssets({ projectId, files }) {
+  console.log(`\n☁️ Toplu CDN upload başlatılıyor...`);
+  console.log(`   Project ID: ${projectId}`);
+  console.log(`   Dosya sayısı: ${files.length}`);
+
+  try {
+    const response = await axios.post(
+      `${PYTHON_API_URL}/api/video/upload-project-assets`,
+      {
+        project_id: projectId,
+        files: files,
+      },
+      { timeout: 600000 } // 10 dakika timeout
+    );
+
+    if (response.data.success) {
+      console.log(
+        `✅ Toplu upload tamamlandı: ${response.data.uploaded}/${response.data.total}`
+      );
+      return {
+        success: true,
+        uploads: response.data.uploads,
+        uploaded: response.data.uploaded,
+        failed: response.data.failed,
+      };
+    } else {
+      console.error(`❌ Toplu upload başarısız:`, response.data.error);
+      return {
+        success: false,
+        error: response.data.error,
+      };
+    }
+  } catch (error) {
+    console.error(`❌ Toplu upload hatası:`, error.message);
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
+}
+
 module.exports = {
   requestVideoGeneration,
   generateVideoSync,
   checkPythonApiHealth,
   mergeVideoWithAudio,
   concatenateVideos,
+  uploadProjectAssets,
   gpuTest,
   PYTHON_API_URL,
   NODE_CALLBACK_URL,

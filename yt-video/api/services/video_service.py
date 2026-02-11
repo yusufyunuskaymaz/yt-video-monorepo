@@ -5,8 +5,24 @@ Mevcut Python scriptlerini kullanarak video üretimi
 import os
 import sys
 import tempfile
+import shutil
 import requests
 from urllib.parse import urlparse
+
+# Proje dosyaları için paylaşımlı dizin (FLUX API ile ortak)
+PROJECTS_DIR = "/tmp/projects"
+
+def get_project_dir(project_id: str) -> str:
+    """Proje için paylaşımlı dizin oluştur/döndür"""
+    if not project_id:
+        return tempfile.mkdtemp(prefix="video_")
+    d = os.path.join(PROJECTS_DIR, str(project_id))
+    os.makedirs(d, exist_ok=True)
+    return d
+
+def is_local_path(path: str) -> bool:
+    """URL mi yoksa lokal dosya yolu mu kontrol et"""
+    return path and (path.startswith("/") or path.startswith("./"))
 
 # API dizini
 API_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -52,43 +68,49 @@ def process_video(
     pan_direction: str = "horizontal",
     subtitles: list = None,
     project_id: str = None,
-    scene_number: int = None
+    scene_number: int = None,
+    skip_cdn: bool = False
 ) -> dict:
     """
-    Resimden video oluştur ve CDN'e yükle
+    Resimden video oluştur. skip_cdn=True ise lokal path döndür.
     """
     print(f"\n🎬 ========== VIDEO İŞLEME BAŞLADI ==========")
-    print(f"📷 Resim URL: {image_url}")
+    print(f"📷 Resim: {image_url}")
     print(f"🎯 Scene ID: {scene_id}")
     print(f"⏱️ Süre: {duration}s")
     print(f"➡️ Yön: {pan_direction}")
+    print(f"💾 CDN: {'Hayır (lokal)' if skip_cdn else 'Evet'}")
     if project_id: print(f"📁 Proje ID: {project_id}")
     if scene_number: print(f"🎬 Sahne No: {scene_number}")
     print(f"================================================\n")
     
-    # Geçici klasör oluştur
-    temp_dir = tempfile.mkdtemp(prefix="video_")
+    # Proje dizini veya geçici dizin
+    project_dir = get_project_dir(project_id)
+    use_temp = not project_id
     
     try:
-        # Metada for logging
         meta = {"scene_id": scene_id, "project_id": project_id, "scene_number": scene_number}
 
-        # 1. Resmi indir
-        image_ext = os.path.splitext(urlparse(image_url).path)[1] or ".jpg"
-        image_path = os.path.join(temp_dir, f"input{image_ext}")
-        with Timer("PY_IMAGE_DOWNLOAD", meta):
-            download_image(image_url, image_path)
+        # 1. Resim - lokal path mi URL mi?
+        if is_local_path(image_url):
+            image_path = image_url
+            print(f"📂 Lokal resim kullanılıyor: {image_path}")
+        else:
+            image_ext = os.path.splitext(urlparse(image_url).path)[1] or ".jpg"
+            image_path = os.path.join(project_dir, f"input_scene_{scene_number or 0}{image_ext}")
+            with Timer("PY_IMAGE_DOWNLOAD", meta):
+                download_image(image_url, image_path)
         
         # 2. Video oluştur
-        video_path = os.path.join(temp_dir, "output.mp4")
+        scene_tag = f"scene_{str(scene_number).zfill(3)}" if scene_number else scene_id
+        video_path = os.path.join(project_dir, f"video_{scene_tag}.mp4")
         
-        # Pan yönünü dönüştür
         if pan_direction == "horizontal":
             pan_dir = "left_to_right"
         elif pan_direction == "vertical":
-            pan_dir = "bottom_to_top"  # Aşağıdan yukarıya
+            pan_dir = "bottom_to_top"
         elif pan_direction == "vertical_reverse":
-            pan_dir = "top_to_bottom"  # Yukarıdan aşağıya
+            pan_dir = "top_to_bottom"
         else:
             pan_dir = pan_direction
         
@@ -104,26 +126,32 @@ def process_video(
         # 3. Altyazı ekle (opsiyonel)
         if subtitles and len(subtitles) > 0:
             print(f"\n📝 Altyazılar ekleniyor...")
-            subtitled_path = os.path.join(temp_dir, "output_subtitled.mp4")
+            subtitled_path = os.path.join(project_dir, f"video_{scene_tag}_sub.mp4")
             with Timer("PY_ADD_SUBTITLES", meta):
                 add_timed_subtitles(video_path, subtitles, subtitled_path)
             video_path = subtitled_path
         
-        # 4. CDN'e yükle
-        print(f"\n☁️ CDN'e yükleniyor...")
-        with Timer("PY_CDN_VIDEO_UPLOAD", meta):
-            cdn_url = upload_video(video_path, scene_id)
-        
-        print(f"\n🎉 ========== VIDEO TAMAMLANDI ==========")
-        print(f"🔗 CDN URL: {cdn_url}")
-        print(f"==========================================\n")
-        
-        return {
-            "success": True,
-            "video_url": cdn_url,
-            "scene_id": scene_id,
-            "duration": duration
-        }
+        # 4. CDN'e yükle veya lokal path döndür
+        if skip_cdn:
+            print(f"\n✅ Video lokal: {video_path}")
+            return {
+                "success": True,
+                "video_url": video_path,
+                "local_path": video_path,
+                "scene_id": scene_id,
+                "duration": duration
+            }
+        else:
+            print(f"\n☁️ CDN'e yükleniyor...")
+            with Timer("PY_CDN_VIDEO_UPLOAD", meta):
+                cdn_url = upload_video(video_path, scene_id)
+            print(f"🔗 CDN URL: {cdn_url}")
+            return {
+                "success": True,
+                "video_url": cdn_url,
+                "scene_id": scene_id,
+                "duration": duration
+            }
         
     except Exception as e:
         print(f"\n❌ VIDEO İŞLEME HATASI: {str(e)}")
@@ -134,10 +162,8 @@ def process_video(
         }
         
     finally:
-        # Geçici dosyaları temizle
-        import shutil
-        if os.path.exists(temp_dir):
-            shutil.rmtree(temp_dir)
+        if use_temp and os.path.exists(project_dir):
+            shutil.rmtree(project_dir)
             print(f"🧹 Geçici dosyalar temizlendi")
 
 
@@ -159,40 +185,51 @@ def merge_video_with_audio(
     scene_id: str,
     narration: str = None,
     project_id: str = None,
-    scene_number: int = None
+    scene_number: int = None,
+    skip_cdn: bool = False
 ) -> dict:
     """
-    Sessiz video ile sesi birleştir, altyazı ekle ve CDN'e yükle
-    FFmpeg direct kullanarak GPU NVENC encoding
+    Sessiz video ile sesi birleştir, altyazı ekle.
+    skip_cdn=True ise lokal path döndür.
+    Lokal path gönderilirse indirme atlanır.
     """
     import subprocess
     import json
     from services.subtitle_service import add_karaoke_subtitles
     
     print(f"\n🔗 ========== VIDEO + SES BİRLEŞTİRME (FFmpeg) ==========")
-    print(f"🎬 Video URL: {video_url}")
-    print(f"🔊 Audio URL: {audio_url}")
+    print(f"🎬 Video: {video_url}")
+    print(f"🔊 Audio: {audio_url}")
     print(f"🎯 Scene ID: {scene_id}")
     print(f"📝 Altyazı: {'Var' if narration else 'Yok'}")
+    print(f"💾 CDN: {'Hayır (lokal)' if skip_cdn else 'Evet'}")
     if project_id: print(f"📁 Proje ID: {project_id}")
     if scene_number: print(f"🎬 Sahne No: {scene_number}")
     print(f"=========================================================\n")
     
-    temp_dir = tempfile.mkdtemp(prefix="merge_")
+    project_dir = get_project_dir(project_id)
+    use_temp = not project_id
     
     try:
-        # Metada for logging
         meta = {"scene_id": scene_id, "project_id": project_id, "scene_number": scene_number}
 
-        # 1. Video indir
-        video_path = os.path.join(temp_dir, "video.mp4")
-        with Timer("PY_MERGE_VIDEO_DOWNLOAD", meta):
-            download_file(video_url, video_path)
+        # 1. Video - lokal path mi URL mi?
+        if is_local_path(video_url):
+            video_path = video_url
+            print(f"📂 Lokal video: {video_path}")
+        else:
+            video_path = os.path.join(project_dir, f"video_dl_{scene_number or 0}.mp4")
+            with Timer("PY_MERGE_VIDEO_DOWNLOAD", meta):
+                download_file(video_url, video_path)
         
-        # 2. Ses indir
-        audio_path = os.path.join(temp_dir, "audio.mp3")
-        with Timer("PY_MERGE_AUDIO_DOWNLOAD", meta):
-            download_file(audio_url, audio_path)
+        # 2. Audio - lokal path mi URL mi?
+        if is_local_path(audio_url):
+            audio_path = audio_url
+            print(f"📂 Lokal audio: {audio_path}")
+        else:
+            audio_path = os.path.join(project_dir, f"audio_dl_{scene_number or 0}.mp3")
+            with Timer("PY_MERGE_AUDIO_DOWNLOAD", meta):
+                download_file(audio_url, audio_path)
         
         # 3. FFprobe ile süreleri al
         probe_cmd = ['ffprobe', '-v', 'quiet', '-print_format', 'json', '-show_format', audio_path]
@@ -209,7 +246,8 @@ def merge_video_with_audio(
         print(f"   Ses süresi: {audio_duration:.2f}s")
         
         # 4. FFmpeg ile birleştir (GPU NVENC)
-        merged_path = os.path.join(temp_dir, "merged.mp4")
+        scene_tag = f"scene_{str(scene_number).zfill(3)}" if scene_number else scene_id
+        merged_path = os.path.join(project_dir, f"merged_{scene_tag}.mp4")
         print(f"🔗 FFmpeg ile birleştiriliyor (GPU NVENC)...")
         
         with Timer("PY_FFMPEG_MERGE", meta):
@@ -217,7 +255,7 @@ def merge_video_with_audio(
                 'ffmpeg', '-y',
                 '-i', video_path,
                 '-i', audio_path,
-                '-c:v', 'h264_nvenc',  # GPU encoding
+                '-c:v', 'h264_nvenc',
                 '-preset', 'fast',
                 '-b:v', '5M',
                 '-c:a', 'aac',
@@ -234,11 +272,11 @@ def merge_video_with_audio(
                 print(f"⚠️ FFmpeg stderr: {result.stderr[-500:]}")
                 raise Exception(f"FFmpeg hatası: {result.stderr[-200:]}")
         
-        # 6. Altyazı ekle (narration varsa)
+        # 5. Altyazı ekle (narration varsa)
         output_path = merged_path
         if narration and len(narration.strip()) > 0:
             print(f"\n📝 Altyazı ekleniyor...")
-            subtitled_path = os.path.join(temp_dir, "merged_subtitled.mp4")
+            subtitled_path = os.path.join(project_dir, f"merged_{scene_tag}_sub.mp4")
             with Timer("PY_KARAOKE_SUBTITLES", meta):
                 output_path = add_karaoke_subtitles(
                     video_path=merged_path,
@@ -249,23 +287,28 @@ def merge_video_with_audio(
                     max_words_per_line=5
                 )
         
-        # 7. CDN'e yükle
-        print(f"\n☁️ CDN'e yükleniyor...")
-        import time
-        timestamp = int(time.time())
-        with Timer("PY_CDN_MERGED_UPLOAD", meta):
-            cdn_url = upload_video(output_path, f"merged_{scene_id}")
-        
-        print(f"\n🎉 ========== BİRLEŞTİRME TAMAMLANDI ==========")
-        print(f"🔗 CDN URL: {cdn_url}")
-        print(f"===============================================\n")
-        
-        return {
-            "success": True,
-            "merged_video_url": cdn_url,
-            "scene_id": scene_id,
-            "duration": audio_duration
-        }
+        # 6. CDN'e yükle veya lokal path döndür
+        if skip_cdn:
+            print(f"\n✅ Birleştirme lokal: {output_path}")
+            return {
+                "success": True,
+                "merged_video_url": output_path,
+                "local_path": output_path,
+                "scene_id": scene_id,
+                "duration": audio_duration
+            }
+        else:
+            print(f"\n☁️ CDN'e yükleniyor...")
+            import time
+            with Timer("PY_CDN_MERGED_UPLOAD", meta):
+                cdn_url = upload_video(output_path, f"merged_{scene_id}")
+            print(f"🔗 CDN URL: {cdn_url}")
+            return {
+                "success": True,
+                "merged_video_url": cdn_url,
+                "scene_id": scene_id,
+                "duration": audio_duration
+            }
         
     except Exception as e:
         print(f"\n❌ BİRLEŞTİRME HATASI: {str(e)}")
@@ -278,29 +321,17 @@ def merge_video_with_audio(
         }
         
     finally:
-        import shutil
-        if os.path.exists(temp_dir):
-            shutil.rmtree(temp_dir)
+        if use_temp and os.path.exists(project_dir):
+            shutil.rmtree(project_dir)
             print(f"🧹 Geçici dosyalar temizlendi")
 
 
 def concatenate_videos(video_urls: list, project_id: str) -> dict:
     """
-    Birden fazla video URL'sini sırayla birleştirip tek video yapar.
-    FFmpeg concat demuxer + GPU NVENC encoding kullanır.
-    
-    Args:
-        video_urls: Sıralı video URL listesi
-        project_id: Proje ID
-        
-    Returns:
-        {
-            "success": True,
-            "video_url": "https://cdn.../final_video.mp4",
-            "project_id": "..."
-        }
+    Birden fazla videoyu birleştirip tek video yapar ve CDN'e yükler.
+    Lokal path'ler gönderilirse indirme atlanır.
+    Final video HER ZAMAN CDN'e yüklenir.
     """
-    import shutil
     import subprocess
     
     print(f"\n🎬 ========== VİDEO BİRLEŞTİRME (FFmpeg NVENC) ==========")
@@ -315,40 +346,41 @@ def concatenate_videos(video_urls: list, project_id: str) -> dict:
             "project_id": project_id
         }
     
-    # Tek video varsa direkt döndür
+    # Tek video varsa direkt CDN'e yükle
     if len(video_urls) == 1:
-        print("⚠️ Sadece 1 video var, birleştirme gerekmiyor.")
-        return {
-            "success": True,
-            "video_url": video_urls[0],
-            "project_id": project_id
-        }
+        single = video_urls[0]
+        if is_local_path(single):
+            cdn_url = upload_video(single, f"final_{project_id}")
+            return {"success": True, "video_url": cdn_url, "project_id": project_id}
+        return {"success": True, "video_url": single, "project_id": project_id}
     
-    # Geçici dizin oluştur
-    temp_dir = tempfile.mkdtemp(prefix="concat_")
+    project_dir = get_project_dir(project_id)
     
     try:
-        # 1. Tüm videoları indir
-        downloaded_files = []
-        with Timer("PY_CONCAT_DOWNLOAD_ALL", {"project_id": project_id, "count": len(video_urls)}):
+        # 1. Videoları hazırla (lokal path varsa indirme yok)
+        local_files = []
+        with Timer("PY_CONCAT_PREPARE", {"project_id": project_id, "count": len(video_urls)}):
             for i, url in enumerate(video_urls):
-                print(f"⬇️ İndiriliyor ({i+1}/{len(video_urls)}): {url[:60]}...")
-                local_path = os.path.join(temp_dir, f"video_{i:03d}.mp4")
-                download_file(url, local_path)
-                downloaded_files.append(local_path)
-                print(f"✅ İndirildi: {local_path}")
+                if is_local_path(url):
+                    local_files.append(url)
+                    print(f"📂 Lokal ({i+1}/{len(video_urls)}): {url}")
+                else:
+                    local_path = os.path.join(project_dir, f"concat_{i:03d}.mp4")
+                    print(f"⬇️ İndiriliyor ({i+1}/{len(video_urls)}): {url[:60]}...")
+                    download_file(url, local_path)
+                    local_files.append(local_path)
         
-        # 2. FFmpeg concat listesi oluştur
-        concat_list_path = os.path.join(temp_dir, "concat_list.txt")
+        # 2. FFmpeg concat listesi
+        concat_list_path = os.path.join(project_dir, "concat_list.txt")
         with open(concat_list_path, 'w') as f:
-            for video_path in downloaded_files:
-                f.write(f"file '{video_path}'\n")
+            for vp in local_files:
+                f.write(f"file '{vp}'\n")
         
-        print(f"📝 Concat listesi oluşturuldu: {len(downloaded_files)} video")
+        print(f"📝 Concat listesi: {len(local_files)} video")
         
         # 3. FFmpeg ile birleştir (GPU NVENC)
-        output_path = os.path.join(temp_dir, "final_video.mp4")
-        print(f"� FFmpeg ile birleştiriliyor (GPU NVENC)...")
+        output_path = os.path.join(project_dir, "final_video.mp4")
+        print(f"🔗 FFmpeg ile birleştiriliyor (GPU NVENC)...")
         
         with Timer("PY_FFMPEG_CONCAT", {"project_id": project_id, "count": len(video_urls)}):
             ffmpeg_cmd = [
@@ -356,7 +388,7 @@ def concatenate_videos(video_urls: list, project_id: str) -> dict:
                 '-f', 'concat',
                 '-safe', '0',
                 '-i', concat_list_path,
-                '-c:v', 'h264_nvenc',  # GPU encoding
+                '-c:v', 'h264_nvenc',
                 '-preset', 'fast',
                 '-b:v', '5M',
                 '-maxrate', '8M',
@@ -374,8 +406,8 @@ def concatenate_videos(video_urls: list, project_id: str) -> dict:
         
         print(f"✅ Birleştirme tamamlandı: {output_path}")
         
-        # 4. CDN'e yükle
-        print("\n☁️ CDN'e yükleniyor...")
+        # 4. Final video CDN'e yükle (her zaman)
+        print("\n☁️ Final video CDN'e yükleniyor...")
         with Timer("PY_CDN_FINAL_UPLOAD", {"project_id": project_id}):
             cdn_url = upload_video(output_path, f"final_{project_id}")
         
@@ -400,9 +432,10 @@ def concatenate_videos(video_urls: list, project_id: str) -> dict:
         }
         
     finally:
-        if os.path.exists(temp_dir):
-            shutil.rmtree(temp_dir)
-            print(f"🧹 Geçici dosyalar temizlendi")
+        # Proje dizinini temizle (tüm ara dosyalar)
+        if os.path.exists(project_dir):
+            shutil.rmtree(project_dir)
+            print(f"🧹 Proje dosyaları temizlendi: {project_dir}")
 
 
 
