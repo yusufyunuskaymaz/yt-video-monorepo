@@ -390,7 +390,107 @@ async def cleanup_project(request: CleanupProjectRequest):
         return {"success": True, "message": "Dizin zaten mevcut değil"}
 
 
+# Ses parçalarını birleştir (Multilingual TTS chunking için)
+class ConcatAudioRequest(BaseModel):
+    audio_paths: List[str]  # Lokal ses dosya yolları
+    project_id: str | int
+    output_filename: str = "audio_merged.wav"
+
+
+@router.post("/concat-audio")
+async def concat_audio(request: ConcatAudioRequest):
+    """Birden fazla ses dosyasını FFmpeg ile birleştir"""
+    import subprocess
+    import json
+    from services.video_service import get_project_dir
+
+    project_dir = get_project_dir(str(request.project_id))
+    output_path = os.path.join(project_dir, request.output_filename)
+
+    print(f"\n🔗 ========== SES BİRLEŞTİRME ==========")
+    print(f"📦 Parça sayısı: {len(request.audio_paths)}")
+    print(f"📂 Çıktı: {output_path}")
+    print(f"==========================================\n")
+
+    try:
+        if len(request.audio_paths) == 1:
+            # Tek dosya - kopyala
+            import shutil
+            shutil.copy2(request.audio_paths[0], output_path)
+        else:
+            # FFmpeg concat listesi oluştur
+            concat_list_path = os.path.join(project_dir, "audio_concat_list.txt")
+            with open(concat_list_path, 'w') as f:
+                for path in request.audio_paths:
+                    f.write(f"file '{path}'\n")
+
+            # FFmpeg ile birleştir
+            ffmpeg_cmd = [
+                'ffmpeg', '-y',
+                '-f', 'concat',
+                '-safe', '0',
+                '-i', concat_list_path,
+                '-c', 'copy',
+                output_path
+            ]
+
+            result = subprocess.run(ffmpeg_cmd, capture_output=True, text=True)
+
+            if result.returncode != 0:
+                # copy ile olmazsa re-encode et
+                ffmpeg_cmd = [
+                    'ffmpeg', '-y',
+                    '-f', 'concat',
+                    '-safe', '0',
+                    '-i', concat_list_path,
+                    '-c:a', 'pcm_s16le',
+                    '-ar', '24000',
+                    output_path
+                ]
+                result = subprocess.run(ffmpeg_cmd, capture_output=True, text=True)
+                if result.returncode != 0:
+                    raise Exception(f"FFmpeg hatası: {result.stderr[-200:]}")
+
+            # Concat listesini temizle
+            os.remove(concat_list_path)
+
+        # Süreyi al
+        duration = None
+        try:
+            probe_cmd = ['ffprobe', '-v', 'quiet', '-print_format', 'json', '-show_format', output_path]
+            probe_result = subprocess.run(probe_cmd, capture_output=True, text=True)
+            probe_data = json.loads(probe_result.stdout)
+            duration = float(probe_data['format']['duration'])
+        except:
+            pass
+
+        print(f"✅ Ses birleştirme tamamlandı: {output_path}")
+        if duration:
+            print(f"⏱️ Toplam süre: {duration:.2f}s")
+
+        # Chunk dosyalarını temizle
+        for path in request.audio_paths:
+            if "chunk" in path and os.path.exists(path):
+                os.remove(path)
+
+        return {
+            "success": True,
+            "local_path": output_path,
+            "duration": duration
+        }
+
+    except Exception as e:
+        print(f"❌ Ses birleştirme hatası: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+
 @router.get("/health")
 async def health_check():
     """API sağlık kontrolü"""
     return {"status": "ok", "service": "video-generator"}
+

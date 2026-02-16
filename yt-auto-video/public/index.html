@@ -616,9 +616,29 @@
       <!-- Project Detail Tab -->
       <div id="tab-detail" class="tab-content hidden">
         <div
-          style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap"
+          style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; align-items: center"
         >
           <button class="btn btn-secondary" onclick="goBack()">← Geri</button>
+          <select
+            id="languageSelect"
+            style="
+              padding: 10px 14px;
+              background: rgba(0, 0, 0, 0.3);
+              border: 2px solid rgba(255, 255, 255, 0.15);
+              border-radius: 10px;
+              color: #fff;
+              font-size: 0.85rem;
+              font-weight: 500;
+              cursor: pointer;
+            "
+          >
+            <option value="turkish">🇹🇷 Türkçe</option>
+            <option value="english">🇬🇧 English</option>
+            <option value="german">🇩🇪 Deutsch</option>
+            <option value="french">🇫🇷 Français</option>
+            <option value="spanish">🇪🇸 Español</option>
+            <option value="arabic">🇸🇦 العربية</option>
+          </select>
           <button
             class="btn btn-pipeline"
             id="pipelineBtn"
@@ -1069,7 +1089,7 @@
             {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ voice: "walter", temperature: 0.8 }),
+              body: JSON.stringify({ voice: document.getElementById('languageSelect').value, temperature: 0.8 }),
             }
           );
           const result = await response.json();
@@ -1240,7 +1260,7 @@
             {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ voice: "walter", temperature: 0.8 }),
+              body: JSON.stringify({ voice: document.getElementById('languageSelect').value, temperature: 0.8 }),
             }
           );
           const result = await response.json();

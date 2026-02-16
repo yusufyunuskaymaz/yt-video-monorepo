@@ -372,7 +372,7 @@ async function generateAllVideos(req, res) {
 async function generateAllAudio(req, res) {
   try {
     const { id } = req.params;
-    const { voice = "walter", temperature = 0.8 } = req.body;
+    const { voice = "turkish", temperature = 0.8 } = req.body;
 
     const project = await projectService.getProject(id);
 
@@ -608,7 +608,7 @@ async function mergeAllVideos(req, res) {
 async function generateFullPipeline(req, res) {
   try {
     const { id } = req.params;
-    const { voice = "walter", temperature = 0.8 } = req.body;
+    const { voice = "turkish", temperature = 0.8 } = req.body;
 
     const project = await projectService.getProject(id);
 

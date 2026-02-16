@@ -1,9 +1,12 @@
 /**
- * Audio Service - Fal.ai TTS ile ses üretimi
+ * Audio Service - Fal.ai Chatterbox Multilingual TTS ile ses üretimi
+ * Türkçe dahil 23 dil destekler
  */
 const { fal } = require("../config/fal.config");
 const r2Service = require("./r2.service");
 const { startTimer, endTimer } = require("../utils/timing");
+
+const PYTHON_API_URL = process.env.PYTHON_API_URL || "http://localhost:8000";
 
 /**
  * Benzersiz ID oluştur
@@ -13,38 +16,42 @@ function generateId() {
 }
 
 /**
- * Fal.ai Chatterbox TTS ile ses üret ve R2'ye yükle
+ * Fal.ai Chatterbox Multilingual TTS ile ses üret
+ *
  * @param {object} params
- * @param {string} params.text - Seslendirme metni
- * @param {string} params.sceneId - Sahne ID
- * @param {string} params.voice - Ses tipi (default: walter)
+ * @param {string} params.text - Seslendirme metni (max 300 karakter)
+ * @param {string} params.voice - Dil (default: turkish)
  * @param {number} params.temperature - Temperature (default: 0.8)
  * @returns {Promise<object>}
  */
 async function generateAudio({
   text,
   sceneId,
-  voice = "walter",
+  voice = "turkish",
   temperature = 0.8,
   projectId = null,
   sceneNumber = null,
 }) {
-  console.log(`\n🎙️ ========== TTS GENERATION ==========`);
-  console.log(`📝 Text: ${text.substring(0, 50)}...`);
-  console.log(`🎤 Voice: ${voice}`);
+  const language = voice;
+
+  console.log(`\n🎙️ ========== TTS GENERATION (Multilingual) ==========`);
+  console.log(`📝 Text: ${text.substring(0, 80)}...`);
+  console.log(`🌍 Dil: ${language}`);
   console.log(`🌡️ Temperature: ${temperature}`);
-  console.log(`==========================================\n`);
+  console.log(`======================================================\n`);
 
   try {
-    // Fal.ai TTS API çağrısını ölç
     const ttsTimer = startTimer("FAL_TTS_GENERATION");
+
     const result = await fal.subscribe(
-      "fal-ai/chatterbox/text-to-speech/turbo",
+      "fal-ai/chatterbox/text-to-speech/multilingual",
       {
         input: {
           text: text,
-          voice: voice,
+          voice: language,
           temperature: temperature,
+          exaggeration: 0.5,
+          cfg_scale: 0.5,
         },
         logs: true,
         onQueueUpdate: (update) => {
@@ -54,21 +61,15 @@ async function generateAudio({
         },
       }
     );
+
     endTimer(ttsTimer, { scene: sceneNumber, projectId: projectId });
 
     console.log("✅ Ses başarıyla üretildi!");
 
-    // Fal.ai'den gelen audio URL
-    const falAudioUrl = result.data.audio_url || result.data.audio?.url;
+    const falAudioUrl = result.data.audio?.url || result.data.audio_url;
     console.log("🔊 Fal.ai Audio URL:", falAudioUrl);
 
-    // Ses süresini al (varsa)
-    const duration =
-      result.data.duration || result.data.audio?.duration || null;
-
-    // Eğer projectId varsa, RunPod'daki /tmp/projects/{id}/ dizinine indir
-    const PYTHON_API_URL =
-      process.env.PYTHON_API_URL || "http://localhost:8000";
+    // Eğer projectId varsa, RunPod'a indir (lokal path)
     if (projectId) {
       console.log("📥 Audio RunPod'a indiriliyor...");
       const downloadTimer = startTimer("AUDIO_DOWNLOAD_TO_RUNPOD");
@@ -81,7 +82,7 @@ async function generateAudio({
           body: JSON.stringify({
             url: falAudioUrl,
             project_id: String(projectId),
-            filename: `audio_scene_${String(sceneNumber).padStart(3, "0")}.mp3`,
+            filename: `audio_scene_${String(sceneNumber).padStart(3, "0")}.wav`,
           }),
         }
       );
@@ -96,8 +97,8 @@ async function generateAudio({
           audioUrl: dlResult.local_path,
           localPath: dlResult.local_path,
           falUrl: falAudioUrl,
-          duration: duration,
-          voice: voice,
+          duration: null,
+          voice: language,
           temperature: temperature,
           text: text,
         };
@@ -106,14 +107,14 @@ async function generateAudio({
 
     // Fallback: R2'ye yükle (projectId yoksa)
     const audioId = generateId();
-    const fileName = `audio/${sceneId}_${audioId}.mp3`;
+    const fileName = `audio/${sceneId}_${audioId}.wav`;
 
     console.log("☁️ R2 CDN'e yükleniyor...");
     const r2Timer = startTimer("R2_AUDIO_UPLOAD");
     const cdnUrl = await r2Service.uploadFromUrl(
       falAudioUrl,
       fileName,
-      "audio/mpeg"
+      "audio/wav"
     );
     endTimer(r2Timer, { scene: sceneNumber, projectId: projectId });
 
@@ -125,8 +126,8 @@ async function generateAudio({
       success: true,
       audioUrl: cdnUrl,
       falUrl: falAudioUrl,
-      duration: duration,
-      voice: voice,
+      duration: null,
+      voice: language,
       temperature: temperature,
       text: text,
     };
@@ -141,12 +142,16 @@ async function generateAudio({
 }
 
 /**
- * Mevcut ses seçeneklerini döndür
+ * Desteklenen dilleri döndür
  */
 function getAvailableVoices() {
   return [
-    { id: "walter", name: "Walter", description: "Default erkek ses" },
-    // Diğer sesler eklenebilir
+    { id: "turkish", name: "Türkçe", description: "Türkçe seslendirme" },
+    { id: "english", name: "English", description: "İngilizce seslendirme" },
+    { id: "german", name: "Deutsch", description: "Almanca seslendirme" },
+    { id: "french", name: "Français", description: "Fransızca seslendirme" },
+    { id: "spanish", name: "Español", description: "İspanyolca seslendirme" },
+    { id: "arabic", name: "العربية", description: "Arapça seslendirme" },
   ];
 }
 
